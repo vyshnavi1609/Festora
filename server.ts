@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import nodemailer from "nodemailer";
 import crypto from "crypto";
 import dotenv from "dotenv";
+import util from "util";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -14,6 +15,11 @@ const __dirname = path.dirname(__filename);
 dotenv.config();
 
 const db = new sqlite3.Database("campus_events.db");
+
+// Promisify sqlite3 methods for async/await
+db.runAsync = util.promisify(db.run);
+db.getAsync = util.promisify(db.get);
+db.allAsync = util.promisify(db.all);
 
 // Initialize Database
 db.exec(`
@@ -1173,41 +1179,41 @@ app.post("/api/activity", (req, res) => {
 });
 
 // Robust delete account endpoint
-app.delete("/api/users/:id", (req, res) => {
-  const userId = req.params.id;
-  // Only allow self-delete or admin
-  const requesterId = req.query.requester || req.headers['x-requester-id'];
-  let requester = null;
-  if (requesterId) {
-    requester = db.prepare("SELECT * FROM users WHERE id = ?").get(requesterId);
-  }
-  if (!requester || (requester.id != userId && requester.role !== 'admin')) {
-    return res.status(403).json({ error: "Not authorized to delete this account" });
-  }
+app.delete("/api/users/:id", async (req, res) => {
   try {
-    db.prepare("DELETE FROM club_members WHERE user_id = ?").run(userId);
-    db.prepare("UPDATE clubs SET president_id = NULL WHERE president_id = ?").run(userId);
-    db.prepare("DELETE FROM club_follows WHERE user_id = ?").run(userId);
-    db.prepare("DELETE FROM likes WHERE user_id = ?").run(userId);
-    db.prepare("DELETE FROM bookmarks WHERE user_id = ?").run(userId);
-    db.prepare("DELETE FROM registrations WHERE user_id = ?").run(userId);
-    db.prepare("DELETE FROM comments WHERE user_id = ?").run(userId);
-    db.prepare("DELETE FROM follows WHERE follower_id = ? OR following_id = ?").run(userId, userId);
-    db.prepare("DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?").run(userId, userId);
-    db.prepare("DELETE FROM notifications WHERE user_id = ?").run(userId);
-    db.prepare("DELETE FROM reminders WHERE user_id = ?").run(userId);
-    db.prepare("DELETE FROM event_reminders WHERE user_id = ?").run(userId);
-    db.prepare("DELETE FROM saved_events WHERE user_id = ?").run(userId);
-    db.prepare("DELETE FROM story_views WHERE viewer_id = ?").run(userId);
-    db.prepare("DELETE FROM stories WHERE user_id = ?").run(userId);
-    db.prepare("DELETE FROM activity WHERE user_id = ? OR target_user_id = ?").run(userId, userId);
-    db.prepare("DELETE FROM role_requests WHERE requester_id = ? OR target_user_id = ?").run(userId, userId);
-    db.prepare("DELETE FROM password_reset_tokens WHERE user_id = ?").run(userId);
-    db.prepare("DELETE FROM users WHERE id = ?").run(userId);
+    const userId = req.params.id;
+    // Only allow self-delete or admin
+    const requesterId = req.query.requester || req.headers['x-requester-id'];
+    let requester = null;
+    if (requesterId) {
+      requester = await db.getAsync("SELECT * FROM users WHERE id = ?", requesterId);
+    }
+    if (!requester || (requester.id != userId && requester.role !== 'admin')) {
+      return res.status(403).json({ error: "Not authorized to delete this account" });
+    }
+    await db.runAsync("DELETE FROM club_members WHERE user_id = ?", userId);
+    await db.runAsync("UPDATE clubs SET president_id = NULL WHERE president_id = ?", userId);
+    await db.runAsync("DELETE FROM club_follows WHERE user_id = ?", userId);
+    await db.runAsync("DELETE FROM likes WHERE user_id = ?", userId);
+    await db.runAsync("DELETE FROM bookmarks WHERE user_id = ?", userId);
+    await db.runAsync("DELETE FROM registrations WHERE user_id = ?", userId);
+    await db.runAsync("DELETE FROM comments WHERE user_id = ?", userId);
+    await db.runAsync("DELETE FROM follows WHERE follower_id = ? OR following_id = ?", userId, userId);
+    await db.runAsync("DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?", userId, userId);
+    await db.runAsync("DELETE FROM notifications WHERE user_id = ?", userId);
+    await db.runAsync("DELETE FROM reminders WHERE user_id = ?", userId);
+    await db.runAsync("DELETE FROM event_reminders WHERE user_id = ?", userId);
+    await db.runAsync("DELETE FROM saved_events WHERE user_id = ?", userId);
+    await db.runAsync("DELETE FROM story_views WHERE viewer_id = ?", userId);
+    await db.runAsync("DELETE FROM stories WHERE user_id = ?", userId);
+    await db.runAsync("DELETE FROM activity WHERE user_id = ? OR target_user_id = ?", userId, userId);
+    await db.runAsync("DELETE FROM role_requests WHERE requester_id = ? OR target_user_id = ?", userId, userId);
+    await db.runAsync("DELETE FROM password_reset_tokens WHERE user_id = ?", userId);
+    await db.runAsync("DELETE FROM users WHERE id = ?", userId);
     res.json({ success: true });
   } catch (e) {
     console.error('Delete account error:', e);
-    res.status(500).json({ error: "Failed to delete account", details: e && e.message ? e.message : String(e) });
+    res.status(500).json({ error: "Failed to delete account", details: e.message });
   }
 });
 
@@ -1215,21 +1221,29 @@ app.delete("/api/users/:id", (req, res) => {
 // Background task for reminders
 setInterval(() => {
   const now = new Date().toISOString();
-  const dueReminders = db.prepare(`
+  db.all(`
     SELECT r.*, e.title 
     FROM reminders r 
     JOIN events e ON r.event_id = e.id 
     WHERE r.remind_at <= ? AND r.is_triggered = 0
-  `).all(now);
-
-  for (const reminder of dueReminders) {
-    db.prepare("INSERT INTO notifications (user_id, content, type) VALUES (?, ?, ?)").run(
-      reminder.user_id,
-      `Reminder: The event "${reminder.title}" starts in 1 hour!`,
-      'reminder'
-    );
-    db.prepare("UPDATE reminders SET is_triggered = 1 WHERE id = ?").run(reminder.id);
-  }
+  `, [now], (err, dueReminders) => {
+    if (err) {
+      console.error('Reminder check error:', err);
+      return;
+    }
+    for (const reminder of dueReminders) {
+      db.run("INSERT INTO notifications (user_id, content, type) VALUES (?, ?, ?)", [
+        reminder.user_id,
+        `Reminder: The event "${reminder.title}" starts in 1 hour!`,
+        'reminder'
+      ], (err) => {
+        if (err) console.error('Insert notification error:', err);
+      });
+      db.run("UPDATE reminders SET is_triggered = 1 WHERE id = ?", reminder.id, (err) => {
+        if (err) console.error('Update reminder error:', err);
+      });
+    }
+  });
 }, 60000); // Check every minute
 
 // Start server
