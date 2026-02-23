@@ -1,5 +1,6 @@
 import express from "express";
-import Database from "better-sqlite3";
+import fs from "fs";
+import sqlite3 from "sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
 import nodemailer from "nodemailer";
@@ -12,7 +13,7 @@ const __dirname = path.dirname(__filename);
 // Load environment variables
 dotenv.config();
 
-const db = new Database("campus_events.db");
+const db = new sqlite3.Database("campus_events.db");
 
 // Initialize Database
 db.exec(`
@@ -270,27 +271,27 @@ db.exec(`
     FOREIGN KEY(club_id) REFERENCES clubs(id),
     UNIQUE(user_id, club_id)
   );
-`);
+`, (err) => {
+  if (err) {
+    console.error('Database initialization error:', err);
+  } else {
+    console.log('Database initialized successfully');
+  }
+});
 
 
 // Add missing columns to events table if they don't exist
-try {
-  db.exec(`ALTER TABLE events ADD COLUMN privacy TEXT DEFAULT 'social'`);
-} catch (e) {
-  // Column might already exist
-}
+db.exec(`ALTER TABLE events ADD COLUMN privacy TEXT DEFAULT 'social'`, (err) => {
+  if (err && !err.message.includes('duplicate column')) console.error(err);
+});
 
-try {
-  db.exec(`ALTER TABLE events ADD COLUMN college_code TEXT`);
-} catch (e) {
-  // Column might already exist
-}
+db.exec(`ALTER TABLE events ADD COLUMN college_code TEXT`, (err) => {
+  if (err && !err.message.includes('duplicate column')) console.error(err);
+});
 
-try {
-  db.exec(`ALTER TABLE events ADD COLUMN capacity INTEGER`);
-} catch (e) {
-  // Column might already exist
-}
+db.exec(`ALTER TABLE events ADD COLUMN capacity INTEGER`, (err) => {
+  if (err && !err.message.includes('duplicate column')) console.error(err);
+});
 
 // Cleanup expired stories periodically
 setInterval(() => {
@@ -1210,15 +1211,6 @@ app.delete("/api/users/:id", (req, res) => {
   }
 });
 
-// Serve frontend in production
-if (process.env.NODE_ENV === "production") {
-  const distPath = path.join(__dirname, "../frontend/dist"); // 👈 IMPORTANT
-  app.use(express.static(distPath));
-
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(distPath, "index.html"));
-  });
-}
 
 // Background task for reminders
 setInterval(() => {
@@ -1241,22 +1233,13 @@ setInterval(() => {
 }, 60000); // Check every minute
 
 // Start server
-const PORT = process.env.PORT || 5000;
-// Serve frontend in production
-if (process.env.NODE_ENV === "production") {
-  const distPath = path.join(__dirname, "dist"); // dist is in project root
-  app.use(express.static(distPath));
 
-  // SPA fallback
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(distPath, "index.html"));
-  });
-}
 // 🔎 DEBUG: check if dist/index.html exists on Render
 app.get("/__debug", (req, res) => {
-  const distPath = path.join(__dirname, "dist");
+  const distPath = path.join(process.cwd(), "dist");
   const fs = require("fs");
   const exists = fs.existsSync(path.join(distPath, "index.html"));
+
   res.json({
     cwd: process.cwd(),
     __dirname,
@@ -1265,6 +1248,24 @@ app.get("/__debug", (req, res) => {
     filesInDist: fs.existsSync(distPath) ? fs.readdirSync(distPath) : [],
   });
 });
+
+// Serve frontend in production
+if (process.env.NODE_ENV === "production") {
+  const distPath = path.join(__dirname, "dist");
+
+  console.log("Serving dist from:", distPath);
+  console.log("index.html exists?", fs.existsSync(path.join(distPath, "index.html")));
+
+  app.use(express.static(distPath));
+
+  // SPA fallback (MUST be AFTER /__debug)
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(distPath, "index.html"));
+  });
+}
+
+// Start server LAST
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Festora server running on port ${PORT}`);
 });
