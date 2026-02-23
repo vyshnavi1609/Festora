@@ -343,20 +343,22 @@ app.get("/api/club-follows/count/:clubId", (req, res) => {
 });
 
 // Add qr_code column to events table if it doesn't exist
-try {
-  db.prepare("ALTER TABLE events ADD COLUMN qr_code TEXT").run();
-} catch (e) {
-  // Column already exists
-}
-const adminExists = db.prepare("SELECT * FROM users WHERE role = 'admin'").get();
-if (!adminExists) {
-  db.prepare("INSERT INTO users (username, password, role, full_name) VALUES (?, ?, ?, ?)").run(
-    "admin",
-    "admin123",
-    "admin",
-    "System Administrator"
-  );
-}
+db.exec(`ALTER TABLE events ADD COLUMN qr_code TEXT`, (err) => {
+  if (err && !err.message.includes('duplicate column')) console.error(err);
+});
+
+db.get("SELECT * FROM users WHERE role = 'admin'", (err, row) => {
+  if (err) {
+    console.error('Check admin error:', err);
+    return;
+  }
+  if (!row) {
+    db.run("INSERT INTO users (username, password, role, full_name) VALUES (?, ?, ?, ?)", 
+      ["admin", "admin123", "admin", "System Administrator"], (err) => {
+      if (err) console.error('Insert admin error:', err);
+    });
+  }
+});
 
 // Email transporter
 const emailTransporter = nodemailer.createTransport({
