@@ -730,75 +730,94 @@ app.get("/api/users/search", (req, res) => {
   res.json(users);
 });
 
-app.get("/api/users", (req, res) => {
+app.get("/api/users", async (req, res) => {
   // Get requester id from query or header
   const requesterId = req.query.requester || req.headers['x-requester-id'];
   if (!requesterId) {
     return res.status(401).json({ error: "Authentication required" });
   }
-  const requester = db.prepare("SELECT role FROM users WHERE id = ?").get(requesterId);
-  if (!requester || requester.role !== 'admin') {
-    return res.status(403).json({ error: "Admin access required" });
+  try {
+    const requester = await db.getAsync("SELECT role FROM users WHERE id = ?", requesterId);
+    if (!requester || requester.role !== 'admin') {
+      return res.status(403).json({ error: "Admin access required" });
+    }
+    const users = await db.allAsync("SELECT id, username, full_name, role FROM users");
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  const users = db.prepare("SELECT id, username, full_name, role FROM users").all();
-  res.json(users);
 });
 
-app.get("/api/users/:id", (req, res) => {
-  const user = db.prepare("SELECT id, username, full_name, role, bio, social_links, avatar_url, college_name, roll_no FROM users WHERE id = ?").get(req.params.id);
-  if (!user) {
-    return res.status(404).json({ error: "User not found" });
+app.get("/api/users/:id", async (req, res) => {
+  try {
+    const user = await db.getAsync("SELECT id, username, full_name, role, bio, social_links, avatar_url, college_name, roll_no FROM users WHERE id = ?", req.params.id);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    // Get requester id from query or header (for demo, allow ?requester=ID)
+    const requesterId = req.query.requester || req.headers['x-requester-id'];
+    let requester = null;
+    if (requesterId) {
+      requester = await db.getAsync("SELECT * FROM users WHERE id = ?", requesterId);
+    }
+    if (user.role === 'admin' && (!requester || requester.role !== 'admin')) {
+      return res.status(403).json({ error: "You are not allowed to view admin details" });
+    }
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-  // Get requester id from query or header (for demo, allow ?requester=ID)
-  const requesterId = req.query.requester || req.headers['x-requester-id'];
-  let requester = null;
-  if (requesterId) {
-    requester = db.prepare("SELECT * FROM users WHERE id = ?").get(requesterId);
-  }
-  if (user.role === 'admin' && (!requester || requester.role !== 'admin')) {
-    return res.status(403).json({ error: "You are not allowed to view admin details" });
-  }
-  res.json(user);
 });
 
-app.post("/api/role-requests", (req, res) => {
+app.post("/api/role-requests", async (req, res) => {
   const { requester_id, target_user_id, requested_role } = req.body;
-  const result = db.prepare("INSERT INTO role_requests (requester_id, target_user_id, requested_role) VALUES (?, ?, ?)").run(
-    requester_id, target_user_id, requested_role
-  );
-  res.json({ id: result.lastInsertRowid });
+  try {
+    const result = await db.runAsync("INSERT INTO role_requests (requester_id, target_user_id, requested_role) VALUES (?, ?, ?)", 
+      requester_id, target_user_id, requested_role);
+    res.json({ id: result.lastID });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.get("/api/role-requests/:userId", (req, res) => {
-  const requests = db.prepare(`
-    SELECT role_requests.*, u1.full_name as requester_name, u2.full_name as target_name
-    FROM role_requests
-    JOIN users u1 ON role_requests.requester_id = u1.id
-    JOIN users u2 ON role_requests.target_user_id = u2.id
-    WHERE role_requests.target_user_id = ? OR (
-      SELECT role FROM users WHERE id = ?
-    ) IN ('admin', 'council_president', 'club_president')
-  `).all(req.params.userId, req.params.userId);
-  res.json(requests);
+app.get("/api/role-requests/:userId", async (req, res) => {
+  try {
+    const requests = await db.allAsync(`
+      SELECT role_requests.*, u1.full_name as requester_name, u2.full_name as target_name
+      FROM role_requests
+      JOIN users u1 ON role_requests.requester_id = u1.id
+      JOIN users u2 ON role_requests.target_user_id = u2.id
+      WHERE role_requests.target_user_id = ? OR (
+        SELECT role FROM users WHERE id = ?
+      ) IN ('admin', 'council_president', 'club_president')
+    `, req.params.userId, req.params.userId);
+    res.json(requests);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.post("/api/role-requests/approve", (req, res) => {
+app.post("/api/role-requests/approve", async (req, res) => {
   const { requestId } = req.body;
-  const request = db.prepare("SELECT * FROM role_requests WHERE id = ?").get(requestId);
-  if (request) {
-    db.prepare("UPDATE users SET role = ? WHERE id = ?").run(request.requested_role, request.target_user_id);
-    db.prepare("UPDATE role_requests SET status = 'approved' WHERE id = ?").run(requestId);
-    
-    // Create notification
-    db.prepare("INSERT INTO notifications (user_id, content, type) VALUES (?, ?, ?)").run(
-      request.target_user_id,
-      `Your request for ${request.requested_role.replace('_', ' ')} has been approved!`,
-      'role_update'
-    );
-    
-    res.json({ success: true });
-  } else {
-    res.status(404).json({ error: "Request not found" });
+  try {
+    const request = await db.getAsync("SELECT * FROM role_requests WHERE id = ?", requestId);
+    if (request) {
+      await db.runAsync("UPDATE users SET role = ? WHERE id = ?", request.requested_role, request.target_user_id);
+      await db.runAsync("UPDATE role_requests SET status = 'approved' WHERE id = ?", requestId);
+      
+      // Create notification
+      await db.runAsync("INSERT INTO notifications (user_id, content, type) VALUES (?, ?, ?)", 
+        request.target_user_id,
+        `Your request for ${request.requested_role.replace('_', ' ')} has been approved!`,
+        'role_update'
+      );
+      
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: "Request not found" });
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
