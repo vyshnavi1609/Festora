@@ -1211,23 +1211,17 @@ app.delete("/api/users/:id", (req, res) => {
   }
 });
 
-async function startServer() {
-  const PORT = 3000;
+// Serve frontend in production
+if (process.env.NODE_ENV === "production") {
+  const distPath = path.join(__dirname, "dist");
+  app.use(express.static(distPath));
 
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    app.use(express.static(path.join(__dirname, "dist")));
-    app.get("*", (req, res) => {
-      res.sendFile(path.join(__dirname, "dist", "index.html"));
-    });
-  }
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(distPath, "index.html"));
+  });
+}
 
-  // Background task for reminders
+// Background task for reminders
 setInterval(() => {
   const now = new Date().toISOString();
   const dueReminders = db.prepare(`
@@ -1247,9 +1241,9 @@ setInterval(() => {
   }
 }, 60000); // Check every minute
 
-app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
-}
+// Start server
+const PORT = process.env.PORT || 5000;
 
-startServer();
+app.listen(PORT, () => {
+  console.log(`🚀 Festora server running on port ${PORT}`);
+});
