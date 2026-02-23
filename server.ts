@@ -1242,6 +1242,16 @@ setInterval(() => {
 
 // Start server
 const PORT = process.env.PORT || 5000;
+// ✅ Serve frontend (Vite build) in production
+if (process.env.NODE_ENV === "production") {
+  const distPath = path.join(__dirname, "dist"); // 👈 your dist is at root
+  app.use(express.static(distPath));
+
+  // SPA fallback (React Router)
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(distPath, "index.html"));
+  });
+}
 app.listen(PORT, () => {
   console.log(`🚀 Festora server running on port ${PORT}`);
 });
