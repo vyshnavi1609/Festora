@@ -1,0 +1,5 @@
+{
+  "name": "Festora",
+  "description": "A premium events platform for students and clubs with hierarchical role management and AI-powered visuals.",
+  "requestFramePermissions": ["camera", "microphone"]
+}

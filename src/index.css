@@ -1,0 +1,52 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  
+  --color-festora-primary: #4f46e5;
+  --color-festora-secondary: #9333ea;
+  --color-festora-accent: #db2777;
+}
+
+@layer base {
+  body {
+    @apply bg-white text-zinc-900 antialiased selection:bg-indigo-100 selection:text-indigo-900;
+  }
+}
+
+@utility festora-gradient {
+  background: linear-gradient(135deg, #4f46e5 0%, #9333ea 50%, #db2777 100%);
+}
+
+@utility vibrant-gradient {
+  background: linear-gradient(45deg, #ff0080 0%, #7928ca 50%, #4f46e5 100%);
+}
+
+@utility text-shadow-vibrant {
+  text-shadow: 0 4px 12px rgba(79, 70, 229, 0.4);
+}
+
+@layer components {
+  .category-workshop { @apply bg-emerald-50 text-emerald-700 border-emerald-100; }
+  .category-social { @apply bg-rose-50 text-rose-700 border-rose-100; }
+  .category-academic { @apply bg-blue-50 text-blue-700 border-blue-100; }
+  .category-concert { @apply bg-violet-50 text-violet-700 border-violet-100; }
+
+  .glass-card {
+    @apply bg-white border border-zinc-100 shadow-sm;
+  }
+
+  .btn-primary {
+    @apply vibrant-gradient text-white px-6 py-3.5 rounded-2xl font-black uppercase tracking-widest text-[10px] active:scale-95 transition-all shadow-xl shadow-indigo-100 hover:brightness-110 disabled:opacity-50;
+  }
+
+  .input-field {
+    @apply w-full bg-white border border-zinc-200 rounded-2xl p-4 outline-none focus:border-indigo-500 focus:ring-8 focus:ring-indigo-500/5 transition-all shadow-sm text-zinc-950 placeholder:text-zinc-400 font-medium;
+  }
+
+  .card-shadow {
+    @apply shadow-[0_8px_30px_rgb(0,0,0,0.04)];
+  }
+}
