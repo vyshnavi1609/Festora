@@ -1252,6 +1252,19 @@ if (process.env.NODE_ENV === "production") {
     res.sendFile(path.join(distPath, "index.html"));
   });
 }
+// 🔎 DEBUG: check if dist/index.html exists on Render
+app.get("/__debug", (req, res) => {
+  const distPath = path.join(__dirname, "dist");
+  const fs = require("fs");
+  const exists = fs.existsSync(path.join(distPath, "index.html"));
+  res.json({
+    cwd: process.cwd(),
+    __dirname,
+    distPath,
+    hasIndexHtml: exists,
+    filesInDist: fs.existsSync(distPath) ? fs.readdirSync(distPath) : [],
+  });
+});
 app.listen(PORT, () => {
   console.log(`🚀 Festora server running on port ${PORT}`);
 });
