@@ -1267,7 +1267,7 @@ app.get("/__debug", (req, res) => {
 
 // Serve frontend in production
 if (process.env.NODE_ENV === "production") {
-  const distPath = path.join(__dirname, "dist");
+  const distPath = path.join(process.cwd(), "dist");
 
   console.log("Serving dist from:", distPath);
   console.log("index.html exists?", fs.existsSync(path.join(distPath, "index.html")));
