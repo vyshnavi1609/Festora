@@ -1,5 +1,4 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -1213,7 +1212,7 @@ app.delete("/api/users/:id", (req, res) => {
 
 // Serve frontend in production
 if (process.env.NODE_ENV === "production") {
-  const distPath = path.join(__dirname, "dist");
+  const distPath = path.join(__dirname, "../frontend/dist"); // 👈 IMPORTANT
   app.use(express.static(distPath));
 
   app.get("*", (req, res) => {
@@ -1243,14 +1242,6 @@ setInterval(() => {
 
 // Start server
 const PORT = process.env.PORT || 5000;
-// Serve frontend in production
-if (process.env.NODE_ENV === "production") {
-  app.use(express.static(path.join(__dirname, "dist")));
-
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "dist", "index.html"));
-  });
-}
 app.listen(PORT, () => {
   console.log(`🚀 Festora server running on port ${PORT}`);
 });
