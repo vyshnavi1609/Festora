@@ -1242,12 +1242,12 @@ setInterval(() => {
 
 // Start server
 const PORT = process.env.PORT || 5000;
-// ✅ Serve frontend (Vite build) in production
+// Serve frontend in production
 if (process.env.NODE_ENV === "production") {
-  const distPath = path.join(__dirname, "dist"); // 👈 your dist is at root
+  const distPath = path.join(__dirname, "dist"); // dist is in project root
   app.use(express.static(distPath));
 
-  // SPA fallback (React Router)
+  // SPA fallback
   app.get("*", (req, res) => {
     res.sendFile(path.join(distPath, "index.html"));
   });
