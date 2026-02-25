@@ -1,6 +1,6 @@
 import express from "express";
 import fs from "fs";
-import sqlite3 from "sqlite3";
+import Database from "better-sqlite3";
 import path from "path";
 import { fileURLToPath } from "url";
 import nodemailer from "nodemailer";
@@ -14,12 +14,7 @@ const __dirname = path.dirname(__filename);
 // Load environment variables
 dotenv.config();
 
-const db = new sqlite3.Database("campus_events.db");
-
-// Promisify sqlite3 methods for async/await
-db.runAsync = util.promisify(db.run);
-db.getAsync = util.promisify(db.get);
-db.allAsync = util.promisify(db.all);
+const db = new Database("campus_events.db");
 
 // Initialize Database
 db.exec(`
@@ -277,27 +272,29 @@ db.exec(`
     FOREIGN KEY(club_id) REFERENCES clubs(id),
     UNIQUE(user_id, club_id)
   );
-`, (err) => {
-  if (err) {
-    console.error('Database initialization error:', err);
-  } else {
-    console.log('Database initialized successfully');
-  }
-});
+`);
+
+console.log('Database initialized successfully');
 
 
 // Add missing columns to events table if they don't exist
-db.exec(`ALTER TABLE events ADD COLUMN privacy TEXT DEFAULT 'social'`, (err) => {
-  if (err && !err.message.includes('duplicate column')) console.error(err);
-});
+try {
+  db.exec(`ALTER TABLE events ADD COLUMN privacy TEXT DEFAULT 'social'`);
+} catch (err: any) {
+  if (!err.message.includes('duplicate column')) console.error(err);
+}
 
-db.exec(`ALTER TABLE events ADD COLUMN college_code TEXT`, (err) => {
-  if (err && !err.message.includes('duplicate column')) console.error(err);
-});
+try {
+  db.exec(`ALTER TABLE events ADD COLUMN college_code TEXT`);
+} catch (err: any) {
+  if (!err.message.includes('duplicate column')) console.error(err);
+}
 
-db.exec(`ALTER TABLE events ADD COLUMN capacity INTEGER`, (err) => {
-  if (err && !err.message.includes('duplicate column')) console.error(err);
-});
+try {
+  db.exec(`ALTER TABLE events ADD COLUMN capacity INTEGER`);
+} catch (err: any) {
+  if (!err.message.includes('duplicate column')) console.error(err);
+}
 
 // Cleanup expired stories periodically
 setInterval(() => {
@@ -343,22 +340,22 @@ app.get("/api/club-follows/count/:clubId", (req, res) => {
 });
 
 // Add qr_code column to events table if it doesn't exist
-db.exec(`ALTER TABLE events ADD COLUMN qr_code TEXT`, (err) => {
-  if (err && !err.message.includes('duplicate column')) console.error(err);
-});
+try {
+  db.exec(`ALTER TABLE events ADD COLUMN qr_code TEXT`);
+} catch (err: any) {
+  if (!err.message.includes('duplicate column')) console.error(err);
+}
 
-db.get("SELECT * FROM users WHERE role = 'admin'", (err, row) => {
-  if (err) {
-    console.error('Check admin error:', err);
-    return;
-  }
+try {
+  const row = db.prepare("SELECT * FROM users WHERE role = 'admin'").get();
   if (!row) {
-    db.run("INSERT INTO users (username, password, role, full_name) VALUES (?, ?, ?, ?)", 
-      ["admin", "admin123", "admin", "System Administrator"], (err) => {
-      if (err) console.error('Insert admin error:', err);
-    });
+    db.prepare("INSERT INTO users (username, password, role, full_name) VALUES (?, ?, ?, ?)").run(
+      "admin", "admin123", "admin", "System Administrator"
+    );
   }
-});
+} catch (err) {
+  console.error('Admin user setup error:', err);
+}
 
 // Email transporter
 const emailTransporter = nodemailer.createTransport({
@@ -730,27 +727,27 @@ app.get("/api/users/search", (req, res) => {
   res.json(users);
 });
 
-app.get("/api/users", async (req, res) => {
+app.get("/api/users", (req, res) => {
   // Get requester id from query or header
   const requesterId = req.query.requester || req.headers['x-requester-id'];
   if (!requesterId) {
     return res.status(401).json({ error: "Authentication required" });
   }
   try {
-    const requester = await db.getAsync("SELECT role FROM users WHERE id = ?", requesterId);
+    const requester = db.prepare("SELECT role FROM users WHERE id = ?").get(requesterId);
     if (!requester || requester.role !== 'admin') {
       return res.status(403).json({ error: "Admin access required" });
     }
-    const users = await db.allAsync("SELECT id, username, full_name, role FROM users");
+    const users = db.prepare("SELECT id, username, full_name, role FROM users").all();
     res.json(users);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get("/api/users/:id", async (req, res) => {
+app.get("/api/users/:id", (req, res) => {
   try {
-    const user = await db.getAsync("SELECT id, username, full_name, role, bio, social_links, avatar_url, college_name, roll_no FROM users WHERE id = ?", req.params.id);
+    const user = db.prepare("SELECT id, username, full_name, role, bio, social_links, avatar_url, college_name, roll_no FROM users WHERE id = ?").get(req.params.id);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -758,7 +755,7 @@ app.get("/api/users/:id", async (req, res) => {
     const requesterId = req.query.requester || req.headers['x-requester-id'];
     let requester = null;
     if (requesterId) {
-      requester = await db.getAsync("SELECT * FROM users WHERE id = ?", requesterId);
+      requester = db.prepare("SELECT * FROM users WHERE id = ?").get(requesterId);
     }
     if (user.role === 'admin' && (!requester || requester.role !== 'admin')) {
       return res.status(403).json({ error: "You are not allowed to view admin details" });
@@ -769,20 +766,20 @@ app.get("/api/users/:id", async (req, res) => {
   }
 });
 
-app.post("/api/role-requests", async (req, res) => {
+app.post("/api/role-requests", (req, res) => {
   const { requester_id, target_user_id, requested_role } = req.body;
   try {
-    const result = await db.runAsync("INSERT INTO role_requests (requester_id, target_user_id, requested_role) VALUES (?, ?, ?)", 
+    const result = db.prepare("INSERT INTO role_requests (requester_id, target_user_id, requested_role) VALUES (?, ?, ?)").run(
       requester_id, target_user_id, requested_role);
-    res.json({ id: result.lastID });
+    res.json({ id: result.lastInsertRowid });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get("/api/role-requests/:userId", async (req, res) => {
+app.get("/api/role-requests/:userId", (req, res) => {
   try {
-    const requests = await db.allAsync(`
+    const requests = db.prepare(`
       SELECT role_requests.*, u1.full_name as requester_name, u2.full_name as target_name
       FROM role_requests
       JOIN users u1 ON role_requests.requester_id = u1.id
@@ -790,23 +787,23 @@ app.get("/api/role-requests/:userId", async (req, res) => {
       WHERE role_requests.target_user_id = ? OR (
         SELECT role FROM users WHERE id = ?
       ) IN ('admin', 'council_president', 'club_president')
-    `, req.params.userId, req.params.userId);
+    `).all(req.params.userId, req.params.userId);
     res.json(requests);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post("/api/role-requests/approve", async (req, res) => {
+app.post("/api/role-requests/approve", (req, res) => {
   const { requestId } = req.body;
   try {
-    const request = await db.getAsync("SELECT * FROM role_requests WHERE id = ?", requestId);
+    const request = db.prepare("SELECT * FROM role_requests WHERE id = ?").get(requestId);
     if (request) {
-      await db.runAsync("UPDATE users SET role = ? WHERE id = ?", request.requested_role, request.target_user_id);
-      await db.runAsync("UPDATE role_requests SET status = 'approved' WHERE id = ?", requestId);
+      db.prepare("UPDATE users SET role = ? WHERE id = ?").run(request.requested_role, request.target_user_id);
+      db.prepare("UPDATE role_requests SET status = 'approved' WHERE id = ?").run(requestId);
       
       // Create notification
-      await db.runAsync("INSERT INTO notifications (user_id, content, type) VALUES (?, ?, ?)", 
+      db.prepare("INSERT INTO notifications (user_id, content, type) VALUES (?, ?, ?)").run(
         request.target_user_id,
         `Your request for ${request.requested_role.replace('_', ' ')} has been approved!`,
         'role_update'
@@ -1200,37 +1197,37 @@ app.post("/api/activity", (req, res) => {
 });
 
 // Robust delete account endpoint
-app.delete("/api/users/:id", async (req, res) => {
+app.delete("/api/users/:id", (req, res) => {
   try {
     const userId = req.params.id;
     // Only allow self-delete or admin
     const requesterId = req.query.requester || req.headers['x-requester-id'];
     let requester = null;
     if (requesterId) {
-      requester = await db.getAsync("SELECT * FROM users WHERE id = ?", requesterId);
+      requester = db.prepare("SELECT * FROM users WHERE id = ?").get(requesterId);
     }
     if (!requester || (requester.id != userId && requester.role !== 'admin')) {
       return res.status(403).json({ error: "Not authorized to delete this account" });
     }
-    await db.runAsync("DELETE FROM club_members WHERE user_id = ?", userId);
-    await db.runAsync("UPDATE clubs SET president_id = NULL WHERE president_id = ?", userId);
-    await db.runAsync("DELETE FROM club_follows WHERE user_id = ?", userId);
-    await db.runAsync("DELETE FROM likes WHERE user_id = ?", userId);
-    await db.runAsync("DELETE FROM bookmarks WHERE user_id = ?", userId);
-    await db.runAsync("DELETE FROM registrations WHERE user_id = ?", userId);
-    await db.runAsync("DELETE FROM comments WHERE user_id = ?", userId);
-    await db.runAsync("DELETE FROM follows WHERE follower_id = ? OR following_id = ?", userId, userId);
-    await db.runAsync("DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?", userId, userId);
-    await db.runAsync("DELETE FROM notifications WHERE user_id = ?", userId);
-    await db.runAsync("DELETE FROM reminders WHERE user_id = ?", userId);
-    await db.runAsync("DELETE FROM event_reminders WHERE user_id = ?", userId);
-    await db.runAsync("DELETE FROM saved_events WHERE user_id = ?", userId);
-    await db.runAsync("DELETE FROM story_views WHERE viewer_id = ?", userId);
-    await db.runAsync("DELETE FROM stories WHERE user_id = ?", userId);
-    await db.runAsync("DELETE FROM activity WHERE user_id = ? OR target_user_id = ?", userId, userId);
-    await db.runAsync("DELETE FROM role_requests WHERE requester_id = ? OR target_user_id = ?", userId, userId);
-    await db.runAsync("DELETE FROM password_reset_tokens WHERE user_id = ?", userId);
-    await db.runAsync("DELETE FROM users WHERE id = ?", userId);
+    db.prepare("DELETE FROM club_members WHERE user_id = ?").run(userId);
+    db.prepare("UPDATE clubs SET president_id = NULL WHERE president_id = ?").run(userId);
+    db.prepare("DELETE FROM club_follows WHERE user_id = ?").run(userId);
+    db.prepare("DELETE FROM likes WHERE user_id = ?").run(userId);
+    db.prepare("DELETE FROM bookmarks WHERE user_id = ?").run(userId);
+    db.prepare("DELETE FROM registrations WHERE user_id = ?").run(userId);
+    db.prepare("DELETE FROM comments WHERE user_id = ?").run(userId);
+    db.prepare("DELETE FROM follows WHERE follower_id = ? OR following_id = ?").run(userId, userId);
+    db.prepare("DELETE FROM messages WHERE sender_id = ? OR receiver_id = ?").run(userId, userId);
+    db.prepare("DELETE FROM notifications WHERE user_id = ?").run(userId);
+    db.prepare("DELETE FROM reminders WHERE user_id = ?").run(userId);
+    db.prepare("DELETE FROM event_reminders WHERE user_id = ?").run(userId);
+    db.prepare("DELETE FROM saved_events WHERE user_id = ?").run(userId);
+    db.prepare("DELETE FROM story_views WHERE viewer_id = ?").run(userId);
+    db.prepare("DELETE FROM stories WHERE user_id = ?").run(userId);
+    db.prepare("DELETE FROM activity WHERE user_id = ? OR target_user_id = ?").run(userId, userId);
+    db.prepare("DELETE FROM role_requests WHERE requester_id = ? OR target_user_id = ?").run(userId, userId);
+    db.prepare("DELETE FROM password_reset_tokens WHERE user_id = ?").run(userId);
+    db.prepare("DELETE FROM users WHERE id = ?").run(userId);
     res.json({ success: true });
   } catch (e) {
     console.error('Delete account error:', e);
@@ -1241,30 +1238,30 @@ app.delete("/api/users/:id", async (req, res) => {
 
 // Background task for reminders
 setInterval(() => {
-  const now = new Date().toISOString();
-  db.all(`
-    SELECT r.*, e.title 
-    FROM reminders r 
-    JOIN events e ON r.event_id = e.id 
-    WHERE r.remind_at <= ? AND r.is_triggered = 0
-  `, [now], (err, dueReminders) => {
-    if (err) {
-      console.error('Reminder check error:', err);
-      return;
-    }
+  try {
+    const now = new Date().toISOString();
+    const dueReminders = db.prepare(`
+      SELECT r.*, e.title 
+      FROM reminders r 
+      JOIN events e ON r.event_id = e.id 
+      WHERE r.remind_at <= ? AND r.is_triggered = 0
+    `).all(now);
+    
     for (const reminder of dueReminders) {
-      db.run("INSERT INTO notifications (user_id, content, type) VALUES (?, ?, ?)", [
-        reminder.user_id,
-        `Reminder: The event "${reminder.title}" starts in 1 hour!`,
-        'reminder'
-      ], (err) => {
-        if (err) console.error('Insert notification error:', err);
-      });
-      db.run("UPDATE reminders SET is_triggered = 1 WHERE id = ?", reminder.id, (err) => {
-        if (err) console.error('Update reminder error:', err);
-      });
+      try {
+        db.prepare("INSERT INTO notifications (user_id, content, type) VALUES (?, ?, ?)").run([
+          reminder.user_id,
+          `Reminder: The event "${reminder.title}" starts in 1 hour!`,
+          'reminder'
+        ]);
+        db.prepare("UPDATE reminders SET is_triggered = 1 WHERE id = ?").run(reminder.id);
+      } catch (err) {
+        console.error('Reminder processing error:', err);
+      }
     }
-  });
+  } catch (err) {
+    console.error('Reminder check error:', err);
+  }
 }, 60000); // Check every minute
 
 // Start server
