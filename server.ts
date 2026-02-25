@@ -12,7 +12,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Load environment variables
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const db = new Database("campus_events.db");
 
@@ -386,15 +386,15 @@ app.post("/api/login", (req, res) => {
   }
 });
 
-app.post("/api/register", (req, res) => {
+app.post("/api/register", async (req, res) => {
   const { username, email, phone_number, password, full_name, avatar_url, college_name, roll_no } = req.body;
-  
+
   // Check if roll number already exists for this college
   const existingRollNo = db.prepare("SELECT id FROM users WHERE college_name = ? AND roll_no = ?").get(college_name, roll_no);
   if (existingRollNo) {
     return res.status(400).json({ error: "A student with this roll number already exists in your college" });
   }
-  
+
   try {
     const result = db.prepare("INSERT INTO users (username, email, phone_number, password, full_name, avatar_url, college_name, roll_no, role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
       username,
@@ -408,6 +408,50 @@ app.post("/api/register", (req, res) => {
       'student'
     );
     const user = db.prepare("SELECT * FROM users WHERE id = ?").get(result.lastInsertRowid);
+
+    // Send welcome email
+    const welcomeMailOptions = {
+      from: `Festora <${process.env.EMAIL_FROM}>`,
+      to: email,
+      subject: 'Welcome to Festora - Registration Successful!',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #6366f1;">Welcome to Festora, ${full_name}!</h2>
+          <p>Congratulations! Your account has been successfully created.</p>
+
+          <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #333;">Your Account Details:</h3>
+            <p><strong>Username:</strong> ${username}</p>
+            <p><strong>Email:</strong> ${email}</p>
+            <p><strong>College:</strong> ${college_name}</p>
+            <p><strong>Roll Number:</strong> ${roll_no}</p>
+          </div>
+
+          <p>You can now:</p>
+          <ul>
+            <li>Discover and attend exciting campus events</li>
+            <li>Create and manage your own events</li>
+            <li>Connect with fellow students</li>
+            <li>Stay updated with college activities</li>
+          </ul>
+
+          <a href="${process.env.APP_URL}" style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 16px 0;">Start Exploring Events</a>
+
+          <p>If you have any questions, feel free to reach out to us.</p>
+          <p>Best regards,<br>The Festora Team</p>
+        </div>
+      `
+    };
+
+    try {
+      console.log('Sending welcome email to:', email);
+      await emailTransporter.sendMail(welcomeMailOptions);
+      console.log('Welcome email sent successfully to:', email);
+    } catch (emailError) {
+      console.error('Failed to send welcome email:', emailError);
+      // Don't fail registration if email fails, just log it
+    }
+
     res.json(user);
   } catch (e: any) {
     if (e.message.includes("UNIQUE constraint failed")) {

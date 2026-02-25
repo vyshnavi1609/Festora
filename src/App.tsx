@@ -3027,13 +3027,13 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const endpoint = isLogin ? '/api/login' : '/api/register';
-    const payload = isLogin 
+    const payload = isLogin
       ? { identifier: formData.identifier, password: formData.password }
-      : { 
-          username: formData.username, 
-          email: formData.email, 
-          phone_number: formData.phone_number, 
-          password: formData.password, 
+      : {
+          username: formData.username,
+          email: formData.email,
+          phone_number: formData.phone_number,
+          password: formData.password,
           full_name: formData.full_name,
           avatar_url: formData.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${formData.username}`,
           college_name: formData.college_name,
