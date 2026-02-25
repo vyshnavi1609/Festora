@@ -50,8 +50,8 @@ import { GoogleGenAI } from "@google/genai";
 import { QRCodeCanvas } from 'qrcode.react';
 import { User, Event, Role, RoleRequest, Message, Comment, Analytics, Notification } from './types';
 
-const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY || '' });
-
+const apiKey = import.meta.env.VITE_GEMINI_API_KEY || "";
+const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 const ImagePicker = ({ onImageSelected, currentImage }: { onImageSelected: (base64: string) => void, currentImage?: string }) => {
   const [showOptions, setShowOptions] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
