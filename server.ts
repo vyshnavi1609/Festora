@@ -1402,7 +1402,7 @@ if (process.env.NODE_ENV === "production") {
 }
 
 // Start server LAST
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+const PORT = parseInt(process.env.PORT || '5000', 10);
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Festora server running on port ${PORT}`);
 });

@@ -12,21 +12,22 @@ export default defineConfig(({ mode }) => {
       outDir: "dist",          // ✅ ensures index.html goes into dist/
       emptyOutDir: true
     },
+    server: {
+      host: true, // Allow access from other devices on the network
+      hmr: process.env.DISABLE_HMR !== 'true',
+      proxy: {
+        '/api': {
+          target: 'http://localhost:8080',
+          changeOrigin: true,
+        },
+      },
+    },
     define: {
       'import.meta.env.VITE_GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
-      },
-    },
-    server: {
-      hmr: process.env.DISABLE_HMR !== 'true',
-      proxy: {
-        '/api': {
-          target: 'http://localhost:5000',
-          changeOrigin: true,
-        },
       },
     },
   };

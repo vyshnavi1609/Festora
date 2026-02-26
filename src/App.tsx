@@ -3316,7 +3316,6 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
                         }
                       }}
                       onFocus={() => setShowCollegeDropdown(true)}
-                      onBlur={() => setTimeout(() => setShowCollegeDropdown(false), 200)}
                       onKeyDown={e => {
                         if (e.key === 'Enter') {
                           e.preventDefault();
@@ -3336,6 +3335,8 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
                             setCollegeSearch('Others');
                           }
                           setShowCollegeDropdown(false);
+                        } else if (e.key === 'Escape') {
+                          setShowCollegeDropdown(false);
                         }
                       }}
                       required
@@ -3348,7 +3349,8 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
                               key={college}
                               type="button"
                               className="w-full text-left px-4 py-3 hover:bg-zinc-50 transition-colors first:rounded-t-2xl last:rounded-b-2xl"
-                              onClick={() => {
+                              onMouseDown={(e) => {
+                                e.preventDefault(); // Prevent blur from firing
                                 setFormData({...formData, college_name: college});
                                 setCollegeSearch(college);
                                 setShowCollegeDropdown(false);
