@@ -361,10 +361,12 @@ app.get("/api/club-follows/count/:clubId", async (req, res) => {
 });
 
 // Add qr_code column to events table if it doesn't exist
+// Postgres supports IF NOT EXISTS, so this will quietly skip existing column
 try {
-  await execute(`ALTER TABLE events ADD COLUMN qr_code TEXT`);
+  await execute(`ALTER TABLE events ADD COLUMN IF NOT EXISTS qr_code TEXT`);
 } catch (err: any) {
-  if (!err.message.includes('duplicate column')) console.error(err);
+  // should never hit, but log anything unexpected
+  console.error('Failed to add qr_code column:', err.message || err);
 }
 
 try {
@@ -811,14 +813,18 @@ app.get("/api/users/:id", async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
-    // Get requester id from query or header (for demo, allow ?requester=ID)
-    const requesterId = req.query.requester || req.headers['x-requester-id'];
-    let requester = null;
-    if (requesterId) {
-      requester = await queryOne("SELECT * FROM users WHERE id = $1", [requesterId]);
-    }
-    if (user.role === 'admin' && (!requester || requester.role !== 'admin')) {
-      return res.status(403).json({ error: "You are not allowed to view admin details" });
+    // Only admin-only fields need requester check; students can view each other
+    // If target is admin, only let admins view full details
+    if (user.role === 'admin') {
+      const requesterId = req.query.requester || req.headers['x-requester-id'];
+      if (requesterId) {
+        const requester = await queryOne("SELECT role FROM users WHERE id = $1", [requesterId]);
+        if (!requester || requester.role !== 'admin') {
+          return res.status(403).json({ error: "You are not allowed to view admin details" });
+        }
+      } else {
+        return res.status(403).json({ error: "You are not allowed to view admin details" });
+      }
     }
     res.json(user);
   } catch (err) {
