@@ -3986,13 +3986,23 @@ export default function App() {
       const raw = localStorage.getItem('festora_user');
       if (raw) setUser(JSON.parse(raw));
     } catch (e) { /* ignore */ }
-    
+
+    // automatically clear the stored user when the page is unloaded/closed
+    const handleUnload = () => {
+      localStorage.removeItem('festora_user');
+    };
+    window.addEventListener('beforeunload', handleUnload);
+
     // Check for reset password token in URL
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
     if (token) {
       setResetPasswordToken(token);
     }
+
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+    };
   }, []);
 
   useEffect(() => {
