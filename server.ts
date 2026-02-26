@@ -1146,21 +1146,26 @@ app.get("/api/stories", async (req, res) => {
   // Get stories from users this user follows, plus their own stories
   // Exclude admin stories for non-admin users
   const stories = await query(`
-    SELECT s.*, u.username, u.full_name, u.avatar_url,
-           COUNT(sv.id) as view_count,
-           CASE WHEN sv2.viewer_id IS NOT NULL THEN 1 ELSE 0 END as viewed_by_me
-    FROM stories s
-    JOIN users u ON s.user_id = u.id
-    LEFT JOIN story_views sv ON s.id = sv.story_id
-    LEFT JOIN story_views sv2 ON s.id = sv2.story_id AND sv2.viewer_id = $1
-    WHERE s.expires_at > NOW()
-    AND (s.user_id = $2 OR s.user_id IN (
-      SELECT following_id FROM follows WHERE follower_id = $3
-    ))
-    AND (u.role != 'admin' OR s.user_id = $4)
-    GROUP BY s.id
-    ORDER BY s.created_at DESC
-  `, [userId, userId, userId, userId]);
+  SELECT s.*, u.username, u.full_name, u.avatar_url,
+         COUNT(sv.id) as view_count,
+         CASE WHEN sv2.viewer_id IS NOT NULL THEN 1 ELSE 0 END as viewed_by_me
+  FROM stories s
+  JOIN users u ON s.user_id = u.id
+  LEFT JOIN story_views sv ON s.id = sv.story_id
+  LEFT JOIN story_views sv2 ON s.id = sv2.story_id AND sv2.viewer_id = $1
+  WHERE s.expires_at > NOW()
+  AND (s.user_id = $2 OR s.user_id IN (
+    SELECT following_id FROM follows WHERE follower_id = $3
+  ))
+  AND (u.role != 'admin' OR s.user_id = $4)
+  GROUP BY 
+    s.id,
+    u.username,
+    u.full_name,
+    u.avatar_url,
+    sv2.viewer_id
+  ORDER BY s.created_at DESC
+`, [userId, userId, userId, userId]);
   
   res.json(stories);
 });
