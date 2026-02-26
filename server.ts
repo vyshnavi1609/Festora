@@ -813,19 +813,18 @@ app.get("/api/users/:id", async (req, res) => {
     if (!user) {
       return res.status(404).json({ error: "User not found" });
     }
-    // Only admin-only fields need requester check; students can view each other
-    // If target is admin, only let admins view full details
+    // Admin profiles are restricted; students always viewable
     if (user.role === 'admin') {
       const requesterId = req.query.requester || req.headers['x-requester-id'];
-      if (requesterId) {
-        const requester = await queryOne("SELECT role FROM users WHERE id = $1", [requesterId]);
-        if (!requester || requester.role !== 'admin') {
-          return res.status(403).json({ error: "You are not allowed to view admin details" });
-        }
-      } else {
-        return res.status(403).json({ error: "You are not allowed to view admin details" });
+      if (!requesterId) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      const requester = await queryOne("SELECT role FROM users WHERE id = $1", [requesterId]);
+      if (!requester || requester.role !== 'admin') {
+        return res.status(403).json({ error: "Admin access required" });
       }
     }
+    // All other profiles (students, council_president, etc.) are publicly viewable
     res.json(user);
   } catch (err) {
     res.status(500).json({ error: err.message });
