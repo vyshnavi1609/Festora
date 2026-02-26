@@ -323,6 +323,17 @@ setInterval(async () => {
 const app = express();
 app.use(express.json());
 
+// temporary debug endpoint to verify database connectivity
+app.get("/debug/users", async (req, res) => {
+  try {
+    const users = await query("SELECT * FROM users", []);
+    res.json(users);
+  } catch (err) {
+    console.error("Debug route error:", err);
+    res.status(500).json({ error: "Failed to fetch users" });
+  }
+});
+
 // Club Follows
 app.post("/api/club-follows", async (req, res) => {
   const { user_id, club_id } = req.body;
