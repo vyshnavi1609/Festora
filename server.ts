@@ -73,6 +73,7 @@ db.exec(`
     privacy TEXT DEFAULT 'social', -- 'private' or 'social'
     college_code TEXT, -- for private events
     capacity INTEGER, -- maximum number of attendees
+    pass TEXT, -- registration pass/ticket
     FOREIGN KEY(created_by) REFERENCES users(id)
   );
 
@@ -741,25 +742,27 @@ app.get("/api/analytics/:userId", (req, res) => {
 
 
 app.post("/api/events", (req, res) => {
-  const { title, description, image_url, date, location, category, created_by, privacy, college_code, club_id } = req.body;
+  const { title, description, image_url, date, location, category, created_by, privacy, college_code, club_id, pass } = req.body;
   if (!title || !description || !date || !location) {
     return res.status(400).json({ error: "All fields are required" });
   }
   const eventPrivacy = privacy === 'private' ? 'private' : 'social';
   const eventCollegeCode = eventPrivacy === 'private' ? (college_code || null) : null;
-  const result = db.prepare("INSERT INTO events (title, description, image_url, date, location, category, created_by, privacy, college_code, club_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
-    title, description, image_url, date, location, category || 'Social', created_by, eventPrivacy, eventCollegeCode, club_id || null
+  const result = db.prepare("INSERT INTO events (title, description, image_url, date, location, category, created_by, privacy, college_code, club_id, pass) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+    title, description, image_url, date, location, category || 'Social', created_by, eventPrivacy, eventCollegeCode, club_id || null, pass || null
   );
   res.json({ id: result.lastInsertRowid });
 });
 
 app.put("/api/events/:id", (req, res) => {
-  const { title, description, image_url, date, location, category } = req.body;
+  const { title, description, image_url, date, location, category, privacy, college_code, pass } = req.body;
   if (!title || !description || !date || !location) {
     return res.status(400).json({ error: "All fields are required" });
   }
-  db.prepare("UPDATE events SET title = ?, description = ?, image_url = ?, date = ?, location = ?, category = ? WHERE id = ?").run(
-    title, description, image_url, date, location, category, req.params.id
+  const eventPrivacy = privacy === 'private' ? 'private' : 'social';
+  const eventCollegeCode = eventPrivacy === 'private' ? (college_code || null) : null;
+  db.prepare("UPDATE events SET title = ?, description = ?, image_url = ?, date = ?, location = ?, category = ?, privacy = ?, college_code = ?, pass = ? WHERE id = ?").run(
+    title, description, image_url, date, location, category, eventPrivacy, eventCollegeCode, pass || null, req.params.id
   );
   res.json({ success: true });
 });
@@ -810,11 +813,38 @@ app.get("/api/users/:id", (req, res) => {
   }
 });
 
-app.post("/api/role-requests", (req, res) => {
+app.post("/api/role-requests", async (req, res) => {
   const { requester_id, target_user_id, requested_role } = req.body;
   try {
     const result = db.prepare("INSERT INTO role_requests (requester_id, target_user_id, requested_role) VALUES (?, ?, ?)").run(
       requester_id, target_user_id, requested_role);
+    
+    // Get user details for email
+    const requester = db.prepare("SELECT full_name FROM users WHERE id = ?").get(requester_id);
+    const targetUser = db.prepare("SELECT email, full_name FROM users WHERE id = ?").get(target_user_id);
+    
+    // Send email notification
+    if (targetUser.email) {
+      try {
+        await emailTransporter.sendMail({
+          from: process.env.EMAIL_FROM,
+          to: targetUser.email,
+          subject: `Role Request - ${requested_role}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #6366f1;">Role Request Received</h2>
+              <p>Hi ${targetUser.full_name},</p>
+              <p><strong>${requester.full_name}</strong> has requested to assign you the role of <strong>${requested_role}</strong>.</p>
+              <p>Please log in to your Festora account to approve or reject this request.</p>
+              <p>Best regards,<br>Festora Team</p>
+            </div>
+          `
+        });
+      } catch (emailError) {
+        console.error('Failed to send role request email:', emailError);
+      }
+    }
+    
     res.json({ id: result.lastInsertRowid });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -934,7 +964,7 @@ app.post("/api/reminders", (req, res) => {
 });
 
 // Registrations & Saves
-app.post("/api/register-event", (req, res) => {
+app.post("/api/register-event", async (req, res) => {
   const { user_id, event_id } = req.body;
   
   // Check if user is already registered or waitlisted
@@ -943,8 +973,9 @@ app.post("/api/register-event", (req, res) => {
     return res.status(400).json({ error: "Already registered or waitlisted for this event" });
   }
   
-  // Get event capacity and current registrations
-  const event = db.prepare("SELECT capacity FROM events WHERE id = ?").get(event_id);
+  // Get event details and user email
+  const event = db.prepare("SELECT * FROM events WHERE id = ?").get(event_id);
+  const user = db.prepare("SELECT email, full_name FROM users WHERE id = ?").get(user_id);
   const currentRegistrations = db.prepare("SELECT COUNT(*) as count FROM registrations WHERE event_id = ? AND status = 'registered'").get(event_id);
   
   if (event.capacity && currentRegistrations.count >= event.capacity) {
@@ -954,6 +985,36 @@ app.post("/api/register-event", (req, res) => {
   } else {
     // Register normally
     db.prepare("INSERT INTO registrations (user_id, event_id, status) VALUES (?, ?, 'registered')").run(user_id, event_id);
+    
+    // Send email with pass if it exists
+    if (event.pass && user.email) {
+      try {
+        await emailTransporter.sendMail({
+          from: process.env.EMAIL_FROM,
+          to: user.email,
+          subject: `Registration Pass for ${event.title}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #6366f1;">Event Registration Confirmed!</h2>
+              <p>Hi ${user.full_name},</p>
+              <p>You have successfully registered for <strong>${event.title}</strong>.</p>
+              <p><strong>Event Details:</strong></p>
+              <ul>
+                <li><strong>Date:</strong> ${new Date(event.date).toLocaleDateString()}</li>
+                <li><strong>Location:</strong> ${event.location}</li>
+                <li><strong>Pass/Ticket:</strong> ${event.pass}</li>
+              </ul>
+              <p>Please keep this pass safe for entry to the event.</p>
+              <p>Best regards,<br>Festora Team</p>
+            </div>
+          `
+        });
+      } catch (emailError) {
+        console.error('Failed to send registration email:', emailError);
+        // Don't fail the registration if email fails
+      }
+    }
+    
     res.json({ success: true, status: 'registered', message: 'Successfully registered' });
   }
 });

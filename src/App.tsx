@@ -142,7 +142,6 @@ const Navbar = ({ activeTab, setActiveTab, user }: { activeTab: string, setActiv
     { id: 'discover', icon: Instagram, color: 'text-rose-500' },
     { id: 'promotions', icon: Search, color: 'text-rose-500' },
     { id: 'create', icon: PlusSquare, roles: ['admin', 'council_president', 'club_president', 'club_member'], color: 'text-emerald-500' },
-    { id: 'analytics', icon: BarChart3, roles: ['admin', 'council_president', 'club_president', 'club_member'], color: 'text-blue-500' },
     { id: 'messages', icon: MessageCircle, color: 'text-violet-500' },
     // activity moved into Settings (accessible from Settings -> Your Activity)
     { id: 'profile', icon: UserIcon, color: 'text-amber-500' },
@@ -626,10 +625,10 @@ const CommentModal = ({ event, user, onClose, onCommentAdded }: { event: Event, 
 
 // --- Main Views ---
 
-const CalendarModal = ({ isOpen, onClose, registeredEvents }: { isOpen: boolean, onClose: () => void, registeredEvents: Event[] }) => {
+const CalendarModal = ({ isOpen, onClose, events }: { isOpen: boolean, onClose: () => void, events: Event[] }) => {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   
-  const eventsOnDate = registeredEvents.filter(e => e.date === selectedDate);
+  const eventsOnDate = events.filter(e => e.date === selectedDate);
 
   return (
     <AnimatePresence>
@@ -1367,7 +1366,7 @@ const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, o
       <CalendarModal 
         isOpen={showCalendar} 
         onClose={() => setShowCalendar(false)} 
-        registeredEvents={events.filter(e => registeredEventIds.includes(e.id))}
+        events={events}
       />
     </div>
   );
@@ -1606,7 +1605,10 @@ const CreateEventView = ({ user, onCreated, editingEvent, onCancel }: { user: Us
     location: editingEvent?.location || '',
     category: editingEvent?.category || 'Social',
     image_url: editingEvent?.image_url || '',
-    qr_code: editingEvent?.qr_code || ''
+    qr_code: editingEvent?.qr_code || '',
+    privacy: editingEvent?.privacy || 'social',
+    college_code: editingEvent?.college_code || '',
+    pass: editingEvent?.pass || ''
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isUploading, setIsUploading] = useState(false);
@@ -1827,6 +1829,51 @@ const CreateEventView = ({ user, onCreated, editingEvent, onCancel }: { user: Us
             </div>
           </div>
 
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">Privacy</label>
+            <div className="flex gap-3 mt-1.5">
+              <button
+                type="button"
+                onClick={() => setFormData({...formData, privacy: 'social'})}
+                className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${formData.privacy === 'social' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'}`}
+              >
+                Public
+              </button>
+              <button
+                type="button"
+                onClick={() => setFormData({...formData, privacy: 'private'})}
+                className={`flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all ${formData.privacy === 'private' ? 'bg-indigo-600 text-white shadow-lg' : 'bg-zinc-100 text-zinc-500 hover:bg-zinc-200'}`}
+              >
+                Private
+              </button>
+            </div>
+          </div>
+
+          {formData.privacy === 'private' && (
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">College Code</label>
+              <input
+                type="text"
+                placeholder="College identifier"
+                className="input-field mt-1.5"
+                value={formData.college_code}
+                onChange={e => setFormData({...formData, college_code: e.target.value})}
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">Registration Pass (Optional)</label>
+            <input
+              type="text"
+              placeholder="Pass/ticket for entry"
+              className="input-field mt-1.5"
+              value={formData.pass}
+              onChange={e => setFormData({...formData, pass: e.target.value})}
+            />
+          </div>
+        </div>
+
           <div className="py-2">
             <p className="text-[10px] font-black uppercase tracking-widest text-zinc-400 mb-4">Organizer QR Code (Optional)</p>
             <div className="relative w-40 h-40 bg-zinc-50 rounded-[24px] border-2 border-dashed border-zinc-200 overflow-hidden flex flex-col items-center justify-center group hover:border-indigo-400 transition-all shadow-sm mx-auto mb-4">
@@ -1862,7 +1909,6 @@ const CreateEventView = ({ user, onCreated, editingEvent, onCancel }: { user: Us
               }} />
             </label>
           </div>
-        </div>
 
         <button type="submit" className="btn-primary w-full py-5 shadow-2xl shadow-indigo-100 flex items-center justify-center gap-2">
           {editingEvent ? <><Edit3 size={18} strokeWidth={3} /> Update Event</> : <><PlusSquare size={18} strokeWidth={3} /> Post Event</>}
@@ -3013,8 +3059,34 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
     roll_no: '',
     identifier: '' // For login
   });
+  const [customCollegeName, setCustomCollegeName] = useState('');
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [collegeSearch, setCollegeSearch] = useState('');
+  const [showCollegeDropdown, setShowCollegeDropdown] = useState(false);
+
+  // Sync college search with selected college
+  useEffect(() => {
+    if (formData.college_name && formData.college_name !== 'Others') {
+      setCollegeSearch(formData.college_name);
+    } else if (formData.college_name === 'Others') {
+      setCollegeSearch('Others');
+    }
+  }, [formData.college_name]);
+
+  const colleges = [
+    'GNITS',
+    'CBIT', 
+    'MGIT',
+    'KLU',
+    'VNRVJIET',
+    'IITH',
+    'Others'
+  ];
+
+  const filteredColleges = colleges.filter(college => 
+    college.toLowerCase().includes(collegeSearch.toLowerCase())
+  );
 
   const avatars = [
     'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
@@ -3036,7 +3108,7 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
           password: formData.password,
           full_name: formData.full_name,
           avatar_url: formData.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${formData.username}`,
-          college_name: formData.college_name,
+          college_name: formData.college_name === 'Others' ? customCollegeName : formData.college_name,
           roll_no: formData.roll_no
         };
 
@@ -3082,10 +3154,15 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
         setError('Please fill all required fields');
         return;
       }
+      if (formData.college_name === 'Others' && !customCollegeName.trim()) {
+        setError('Please enter your college name');
+        return;
+      }
       
       // Check if roll number is already taken in this college
+      const collegeToCheck = formData.college_name === 'Others' ? customCollegeName : formData.college_name;
       try {
-        const res = await fetch(`/api/check-rollno?college=${encodeURIComponent(formData.college_name)}&rollno=${encodeURIComponent(formData.roll_no)}`);
+        const res = await fetch(`/api/check-rollno?college=${encodeURIComponent(collegeToCheck)}&rollno=${encodeURIComponent(formData.roll_no)}`);
         if (res.ok) {
           const data = await res.json();
           if (data.exists) {
@@ -3223,14 +3300,84 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
                     onChange={e => setFormData({...formData, phone_number: e.target.value})}
                     required
                   />
-                  <input 
-                    type="text" 
-                    placeholder="College Name" 
-                    className="input-field"
-                    value={formData.college_name}
-                    onChange={e => setFormData({...formData, college_name: e.target.value})}
-                    required
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search and select your college"
+                      className="input-field"
+                      value={collegeSearch}
+                      onChange={e => {
+                        setCollegeSearch(e.target.value);
+                        setShowCollegeDropdown(true);
+                        // Clear selection if user is typing something different
+                        if (e.target.value !== formData.college_name) {
+                          setFormData({...formData, college_name: ''});
+                          setCustomCollegeName('');
+                        }
+                      }}
+                      onFocus={() => setShowCollegeDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowCollegeDropdown(false), 200)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          // If there's an exact match, select it
+                          const exactMatch = colleges.find(college => 
+                            college.toLowerCase() === collegeSearch.toLowerCase()
+                          );
+                          if (exactMatch) {
+                            setFormData({...formData, college_name: exactMatch});
+                            setCollegeSearch(exactMatch);
+                            if (exactMatch !== 'Others') {
+                              setCustomCollegeName('');
+                            }
+                          } else {
+                            // If no exact match, suggest "Others"
+                            setFormData({...formData, college_name: 'Others'});
+                            setCollegeSearch('Others');
+                          }
+                          setShowCollegeDropdown(false);
+                        }
+                      }}
+                      required
+                    />
+                    {showCollegeDropdown && (
+                      <div className="absolute top-full left-0 right-0 bg-white border border-zinc-200 rounded-2xl shadow-lg z-10 max-h-48 overflow-y-auto mt-1">
+                        {filteredColleges.length > 0 ? (
+                          filteredColleges.map(college => (
+                            <button
+                              key={college}
+                              type="button"
+                              className="w-full text-left px-4 py-3 hover:bg-zinc-50 transition-colors first:rounded-t-2xl last:rounded-b-2xl"
+                              onClick={() => {
+                                setFormData({...formData, college_name: college});
+                                setCollegeSearch(college);
+                                setShowCollegeDropdown(false);
+                                if (college !== 'Others') {
+                                  setCustomCollegeName('');
+                                }
+                              }}
+                            >
+                              {college}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3 text-zinc-500 text-sm">
+                            No colleges found. Try "Others" to enter manually.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {formData.college_name === 'Others' && (
+                    <input
+                      type="text"
+                      placeholder="Enter your college name"
+                      className="input-field mt-2"
+                      value={customCollegeName}
+                      onChange={e => setCustomCollegeName(e.target.value)}
+                      required
+                    />
+                  )}
                   <input 
                     type="text" 
                     placeholder="Roll Number" 
@@ -3869,7 +4016,8 @@ export default function App() {
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
   const fetchEvents = () => {
-    fetch('/api/events').then(res => res.json()).then(setEvents);
+    const url = user?.college_name ? `/api/events?college_code=${encodeURIComponent(user.college_name)}` : '/api/events';
+    fetch(url).then(res => res.json()).then(setEvents);
   };
 
   const fetchRegistrations = () => {
@@ -4110,7 +4258,6 @@ export default function App() {
               onCancel={() => setActiveTab(previousTab)}
             />
           )}
-          {activeTab === 'analytics' && <AnalyticsView user={user} />}
           {activeTab === 'notifications' && <NotificationsView user={user} onRead={fetchNotifications} onBack={() => setActiveTab(previousTab)} />}
           {activeTab === 'messages' && <MessagesView user={user} onBack={() => setActiveTab(previousTab)} />}
           {activeTab === 'activity' && <ActivityView user={user} onViewProfile={handleViewProfile} />}

@@ -29,6 +29,9 @@ export interface Event {
   views: number;
   qr_code?: string;
   capacity?: number;
+  privacy?: string;
+  college_code?: string;
+  pass?: string;
 }
 
 export interface Comment {
