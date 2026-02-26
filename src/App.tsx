@@ -4189,14 +4189,19 @@ export default function App() {
   }
 
   if (!user) {
-    return <AuthView onLogin={setUser} />;
+    return (
+      <div className="flex-grow flex items-center justify-center">
+        <AuthView onLogin={setUser} />
+      </div>
+    );
   }
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <div className="min-h-screen bg-zinc-50 font-sans text-zinc-900">
-      <AnimatePresence>
+    <div className="min-h-screen bg-zinc-50 font-sans text-zinc-900 flex flex-col items-center">
+      <div className="w-full max-w-4xl">
+        <AnimatePresence>
         {toast && (
           <motion.div 
             initial={{ opacity: 0, y: -20 }}
@@ -4291,7 +4296,7 @@ export default function App() {
           {activeTab === 'settings' && <SettingsView user={user} onLogout={() => setUser(null)} onBack={() => setActiveTab(previousTab)} setActiveTab={setActiveTab} />}
         </motion.div>
       </AnimatePresence>
-      
+
       <Navbar activeTab={activeTab} setActiveTab={(t) => { setPreviousTab(activeTab); setActiveTab(t); if (t !== 'create') setEditingEvent(null); if (t !== 'profile') setViewingProfileId(null); if (t !== 'home' && t !== 'promotions') setViewingEvent(null); }} user={user} />
       
       <AnimatePresence>
@@ -4326,6 +4331,7 @@ export default function App() {
           onConfirm={confirmRegistration}
         />
       )}
+      </div>
     </div>
   );
 }
