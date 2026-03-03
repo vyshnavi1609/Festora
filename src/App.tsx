@@ -967,11 +967,8 @@ const Stories = ({ user, onViewProfile, onSendMessage }: { user: User, onViewPro
               className={`w-16 h-16 rounded-2xl p-0.5 ${userStories.stories.some((s: any) => !s.viewed_by_me) ? 'bg-gradient-to-tr from-indigo-500 to-rose-500' : 'bg-zinc-200'}`}
             >
               <div className="w-full h-full rounded-xl bg-white p-0.5">
-                <img 
-                  src={userStories.user.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${userStories.user.username}`}
-                  alt="avatar"
-                  className="w-full h-full rounded-lg object-cover"
-                />
+                {/* avatar hidden; no picture shown */}
+                <div className="w-full h-full rounded-lg bg-zinc-200" />
               </div>
             </button>
             <p className="text-[10px] font-black text-zinc-700 mt-2 text-center truncate w-full">{userStories.user.username}</p>
@@ -1018,11 +1015,8 @@ const Stories = ({ user, onViewProfile, onSendMessage }: { user: User, onViewPro
               {/* Story Content */}
               <div className="flex-1 flex flex-col items-center justify-center p-8">
                 <div className="text-center">
-                  <img 
-                    src={stories[selectedStoryIndex].avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${stories[selectedStoryIndex].username}`}
-                    alt="avatar"
-                    className="w-12 h-12 rounded-full mx-auto mb-4 border-2 border-white"
-                  />
+                  {/* avatar hidden in viewer */}
+                  <div className="w-12 h-12 rounded-full mx-auto mb-4 border-2 border-white bg-zinc-200" />
                   <p className="text-white font-black text-sm mb-8">{stories[selectedStoryIndex].username}</p>
                   
                   {stories[selectedStoryIndex].content_type === 'text' ? (
