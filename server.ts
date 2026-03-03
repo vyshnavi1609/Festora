@@ -511,7 +511,7 @@ app.post("/api/forgot-password", async (req, res) => {
   const baseUrl = process.env.APP_URL || req.headers.origin || `http://localhost:${process.env.PORT||5173}`;
   const resetUrl = `${baseUrl.replace(/\/$/, '')}/reset-password?token=${token}`;
   const mailOptions = {
-    from: `Festora <${process.env.EMAIL_FROM}>`,
+    from: process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@festora.local',
     to: email,
     subject: 'Password Reset - Festora',
     html: `
@@ -525,12 +525,13 @@ app.post("/api/forgot-password", async (req, res) => {
   // if SMTP not configured, skip sending and just return link
   const smtpHost = process.env.EMAIL_HOST;
   if (!smtpHost) {
-    console.warn('SMTP not configured, skipping email');
+    console.warn('SMTP not configured (EMAIL_HOST not set), skipping email send');
     return res.json({ message: 'SMTP not configured – link generated', resetUrl });
   }
 
   try {
     console.log('Attempting to send email to:', email);
+    console.log('Email from:', mailOptions.from);
     console.log('Using SMTP config:', {
       host: process.env.EMAIL_HOST,
       port: process.env.EMAIL_PORT,
@@ -538,8 +539,8 @@ app.post("/api/forgot-password", async (req, res) => {
       pass: process.env.EMAIL_PASS ? 'SET' : 'NOT SET'
     });
     
-    await emailTransporter.sendMail(mailOptions);
-    console.log('Email sent successfully to:', email);
+    const info = await emailTransporter.sendMail(mailOptions);
+    console.log('Email sent. Message ID:', info.messageId, 'Response:', info.response);
     // return resetUrl as well for debugging/dev purposes
     res.json({ message: "Password reset email sent successfully", resetUrl });
   } catch (error: any) {
