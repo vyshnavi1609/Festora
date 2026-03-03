@@ -1402,7 +1402,7 @@ const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, o
         <div className="mb-6">
           <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-3">Discover people</h3>
           <div className="flex gap-3">
-            {suggestions.slice(0, 4).map(s => (
+            {suggestions.filter(s => s.id !== user.id).slice(0, 4).map(s => (
               <div key={s.id} className="flex-shrink-0 w-20 text-center">
                 <button onClick={() => onViewProfile(s.id)} className="flex flex-col items-center gap-2">
                   <div className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center border-2 border-white shadow-sm" style={{background: s.avatar_url ? 'transparent' : 'linear-gradient(135deg,#e9d5ff,#c7d2fe)'}}>
@@ -1605,7 +1605,7 @@ const SearchView = ({ events, user, onRegister, onUnregister, onSave, onMessage,
         <div className="max-w-md mx-auto mb-6">
           <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-3">Discover people</h3>
           <div className="flex gap-3">
-            {suggestions.slice(0, 4).map(s => (
+            {suggestions.filter(s => s.id !== user.id).slice(0, 4).map(s => (
               <div key={s.id} className="flex-shrink-0 w-20 text-center">
                 <button onClick={() => onViewProfile(s.id)} className="flex flex-col items-center gap-2">
                   <div className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center border-2 border-white shadow-sm" style={{background: s.avatar_url ? 'transparent' : 'linear-gradient(135deg,#e9d5ff,#c7d2fe)'}}>
@@ -2622,12 +2622,21 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
             </>
           ) : (
             <>
-              <button 
-                onClick={handleFollow}
-                className={`flex-1 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-xl ${isFollowing ? 'bg-zinc-50 text-zinc-600 border border-zinc-100' : 'vibrant-gradient text-white shadow-indigo-100'}`}
-              >
-                {isFollowing ? 'Following' : 'Follow'}
-              </button>
+              <div className="flex gap-4">
+                <button 
+                  onClick={handleFollow}
+                  className={`flex-1 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 shadow-xl ${isFollowing ? 'bg-zinc-50 text-zinc-600 border border-zinc-100' : 'vibrant-gradient text-white shadow-indigo-100'}`}
+                >
+                  {isFollowing ? 'Following' : 'Follow'}
+                </button>
+                <button 
+                  onClick={handleShare}
+                  className="w-12 h-12 bg-zinc-50 rounded-2xl flex items-center justify-center hover:bg-zinc-100 transition-all active:scale-95"
+                  aria-label="Share profile"
+                >
+                  <Share2 size={16} />
+                </button>
+              </div>
               {targetUser?.role === 'club_president' && (
                 <button 
                   onClick={() => sendRoleRequest(targetUser.id, 'club_member')}
@@ -3865,7 +3874,7 @@ const SettingsView = ({ user, onLogout, onBack, setActiveTab, onOpenClubRequest 
     { icon: MessageCircle, label: 'Messages and story replies', key: 'reply_settings', color: 'text-violet-600', desc: 'Control replies and DMs' },
     { icon: Globe, label: 'Follow and invite friends', key: 'follow_invite', color: 'text-amber-700', desc: 'Invite people to Festora' },
     ...(user.role === 'club_president' ? [{ icon: Plus, label: 'Request Club', key: 'request_club', color: 'text-indigo-700', desc: 'Create a new college club' }, { icon: Users, label: 'Manage Club', key: 'manage_club', color: 'text-blue-700', desc: 'Manage your club members' }] : []),
-    ...(user.role === 'council_president' ? [{ icon: CheckCircle2, label: 'Club Requests', key: 'club_requests', color: 'text-emerald-700', desc: 'Review club requests' }] : [])
+    ...(user.role === 'council_president' ? [{ icon: CheckCircle2, label: 'Club Requests', key: 'club_requests', color: 'text-emerald-700', desc: 'Review club requests' }, { icon: Users, label: 'Role Requests', key: 'role_requests', color: 'text-blue-700', desc: 'Review role requests' }] : [])
   ];
 
   const handleClick = async (key: string) => {
@@ -3887,6 +3896,7 @@ const SettingsView = ({ user, onLogout, onBack, setActiveTab, onOpenClubRequest 
     if (key === 'reply_settings') return setModal('reply_settings');
     if (key === 'story_settings') return setModal('story_settings');
     if (key === 'follow_invite') return setModal('follow_invite');
+    if (key === 'role_requests') return setActiveTab?.('role-requests');
   };
 
   return (
@@ -4456,6 +4466,136 @@ const ClubRequestModal = ({ user, isOpen, onClose, onSubmit }: { user: User, isO
         </div>
       </div>
     </motion.div>
+  );
+};
+
+// Role Requests View (for Council President)
+const RoleRequestsView = ({ user, onBack }: { user: User, onBack?: () => void }) => {
+  const [requests, setRequests] = useState<any[]>([]);
+  const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetchRoleRequests = () => {
+    fetch(`/api/role-requests/${user.id}`)
+      .then(res => res.json())
+      .then(data => {
+        // Filter to show only pending role requests for club_president
+        const filtered = data.filter((req: any) => req.requested_role === 'club_president' && req.status === 'pending');
+        setRequests(filtered);
+      })
+      .catch(() => setRequests([]));
+  };
+
+  useEffect(() => {
+    fetchRoleRequests();
+  }, [user.id]);
+
+  const handleApprove = async (requestId: number) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/role-requests/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, reviewedBy: user.id })
+      });
+      if (res.ok) {
+        alert('Role request approved!');
+        setSelectedRequest(null);
+        fetchRoleRequests();
+      } else {
+        alert('Failed to approve request');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error approving request');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleReject = async (requestId: number) => {
+    const reason = prompt('Enter rejection reason (optional):');
+    if (reason === null) return;
+    
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/role-requests/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId, reviewedBy: user.id, reason })
+      });
+      if (res.ok) {
+        alert('Request rejected');
+        setSelectedRequest(null);
+        fetchRoleRequests();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (selectedRequest) {
+    return (
+      <div className="pb-24 pt-6 px-6 max-w-md mx-auto">
+        <button onClick={() => setSelectedRequest(null)} className="mb-6 flex items-center gap-2 text-indigo-600 font-black text-sm">
+          <ChevronLeft size={20} /> Back
+        </button>
+        
+        <div className="bg-blue-50 rounded-3xl p-6 border border-blue-100 mb-6">
+          <h3 className="text-2xl font-black text-zinc-950 mb-2">{selectedRequest.requester_name}</h3>
+          <p className="text-sm text-zinc-600 mb-4">Wants to become a <span className="font-black text-blue-600">Club President</span></p>
+          
+          <div className="flex gap-4 pt-4">
+            <button
+              onClick={() => handleApprove(selectedRequest.id)}
+              disabled={isLoading}
+              className="flex-1 bg-emerald-600 text-white py-3 rounded-2xl font-black text-sm hover:bg-emerald-700 disabled:opacity-50 active:scale-95"
+            >
+              {isLoading ? 'Processing...' : 'Approve'}
+            </button>
+            <button
+              onClick={() => handleReject(selectedRequest.id)}
+              disabled={isLoading}
+              className="flex-1 bg-red-600 text-white py-3 rounded-2xl font-black text-sm hover:bg-red-700 disabled:opacity-50 active:scale-95"
+            >
+              {isLoading ? 'Processing...' : 'Reject'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pb-24 pt-6 px-6 max-w-md mx-auto">
+      <div className="flex items-center gap-4 mb-6">
+        {onBack && (
+          <button onClick={onBack} className="p-2 bg-zinc-100 rounded-full hover:bg-zinc-200 transition-colors">
+            <ChevronLeft size={20} />
+          </button>
+        )}
+        <h2 className="text-3xl font-black tracking-tighter text-zinc-950">Role Requests</h2>
+      </div>
+
+      {requests.length === 0 ? (
+        <div className="py-20 text-center text-zinc-300">
+          <Users size={48} className="mx-auto mb-4 opacity-20" />
+          <p className="font-bold">No pending role requests</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {requests.map(req => (
+            <div key={req.id} className="bg-blue-50 rounded-2xl p-4 border border-blue-100 cursor-pointer hover:border-blue-200 transition-colors" onClick={() => setSelectedRequest(req)}>
+              <p className="font-black text-sm text-zinc-900 mb-1">{req.requester_name}</p>
+              <p className="text-[10px] text-zinc-500 mb-2">Requested: <span className="font-black text-blue-600">Club President</span></p>
+              <p className="text-[10px] text-zinc-400">Click to review</p>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 
@@ -5178,6 +5318,7 @@ export default function App() {
           )}
           {activeTab === 'settings' && <SettingsView user={user} onLogout={() => setUser(null)} onBack={() => setActiveTab(previousTab)} setActiveTab={setActiveTab} onOpenClubRequest={() => setShowClubRequestModal(true)} />}
           {activeTab === 'club-requests' && user.role === 'council_president' && <ClubRequestsView user={user} onBack={() => setActiveTab(previousTab)} />}
+          {activeTab === 'role-requests' && user.role === 'council_president' && <RoleRequestsView user={user} onBack={() => setActiveTab(previousTab)} />}
           {activeTab === 'club-management' && user.role === 'club_president' && <ClubManagementView user={user} onBack={() => setActiveTab(previousTab)} />}
         </motion.div>
       </AnimatePresence>
