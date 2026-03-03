@@ -1388,9 +1388,11 @@ const SearchView = ({ events, user, onRegister, onUnregister, onSave, onMessage,
 
   const filteredEvents = events.filter(e => {
     const lower = search.toLowerCase();
-    const matchesSearch = e.title.toLowerCase().includes(lower) \
-      || e.description.toLowerCase().includes(lower) \
-      || (e.organizer_name && e.organizer_name.toLowerCase().includes(lower));
+    const matchesSearch = (
+      e.title.toLowerCase().includes(lower) ||
+      e.description.toLowerCase().includes(lower) ||
+      (e.organizer_name && e.organizer_name.toLowerCase().includes(lower))
+    );
     const matchesLocation = !filterLocation || e.location.toLowerCase().includes(filterLocation.toLowerCase());
     const matchesDate = !filterDate || e.date === filterDate;
     const matchesCategory = !filterCategory || e.category === filterCategory;
