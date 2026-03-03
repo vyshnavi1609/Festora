@@ -385,7 +385,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, user, onRegister, onUnregi
   const [showQR, setShowQR] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
   const [organizerAvatar, setOrganizerAvatar] = useState<string | null>(null);
-  const canEdit = user.role === 'admin' || user.role === 'council_president' || (user.role === 'club_president' && event.created_by === user.id);
+  const canEdit = user.role === 'admin' || user.role === 'council_president' || (['club_president', 'club_member'].includes(user.role) && event.created_by === user.id);
 
   useEffect(() => {
     fetch(`/api/users/${event.created_by}?requester=${user.id}`)
@@ -4106,7 +4106,7 @@ const [deleteError, setDeleteError] = useState("");
 
 const EventDetailsView = ({ event, user, isRegistered, onRegister, onUnregister, onSave, onMessage, onEdit, onRefresh, onClose, onViewProfile, onShare }: { event: Event, user: User, isRegistered: boolean, onRegister: (id: number) => void, onUnregister: (id: number) => void, onSave: (id: number) => void, onMessage: (id: number) => void, onEdit: (event: Event) => void, onRefresh: () => void, onClose: () => void, onViewProfile: (userId: number) => void, onShare: (event: Event) => void }) => {
   const [showQR, setShowQR] = useState(false);
-  const canEdit = user.role === 'admin' || user.role === 'council_president' || (user.role === 'club_president' && event.created_by === user.id);
+  const canEdit = user.role === 'admin' || user.role === 'council_president' || (['club_president', 'club_member'].includes(user.role) && event.created_by === user.id);
 
   const addToCalendar = () => {
     const title = encodeURIComponent(event.title);

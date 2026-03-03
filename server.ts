@@ -1183,18 +1183,46 @@ app.post("/api/events", async (req, res) => {
 
 app.put("/api/events/:id", async (req, res) => {
   const { title, description, image_url, date, location, category, privacy, college_code, pass, google_form_url } = req.body;
-  if (!title || !description || !date || !location) {
-    return res.status(400).json({ error: "All fields are required" });
+  const eventId = req.params.id;
+  const userId = req.body.created_by || (req as any).user?.id;
+  
+  try {
+    if (!title || !description || !date || !location) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
+    if (google_form_url && !google_form_url.startsWith('http')) {
+      return res.status(400).json({ error: "Invalid Google Form URL" });
+    }
+    
+    // Check authorization: can only edit if admin, council_president, or own event (if club_president/club_member)
+    const event = await queryOne("SELECT created_by FROM events WHERE id = $1", [eventId]);
+    if (!event) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+    
+    if (userId) {
+      const user = await queryOne("SELECT role FROM users WHERE id = $1", [userId]);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      // Allow: admin, council_president, or (club_president/club_member who created it)
+      const canEdit = user.role === 'admin' || user.role === 'council_president' || 
+                     (['club_president', 'club_member'].includes(user.role) && event.created_by === userId);
+      if (!canEdit) {
+        return res.status(403).json({ error: "You can only edit events you created" });
+      }
+    }
+    
+    const eventPrivacy = privacy === 'private' ? 'private' : 'social';
+    const eventCollegeCode = eventPrivacy === 'private' ? (college_code || null) : null;
+    await execute("UPDATE events SET title = $1, description = $2, image_url = $3, date = $4, location = $5, category = $6, privacy = $7, college_code = $8, pass = $9, google_form_url = $10 WHERE id = $11", [
+      title, description, image_url, date, location, category, eventPrivacy, eventCollegeCode, pass || null, google_form_url || null, eventId
+    ]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error updating event:', err.message);
+    res.status(500).json({ error: err.message || 'Failed to update event' });
   }
-  if (google_form_url && !google_form_url.startsWith('http')) {
-    return res.status(400).json({ error: "Invalid Google Form URL" });
-  }
-  const eventPrivacy = privacy === 'private' ? 'private' : 'social';
-  const eventCollegeCode = eventPrivacy === 'private' ? (college_code || null) : null;
-  await execute("UPDATE events SET title = $1, description = $2, image_url = $3, date = $4, location = $5, category = $6, privacy = $7, college_code = $8, pass = $9, google_form_url = $10 WHERE id = $11", [
-    title, description, image_url, date, location, category, eventPrivacy, eventCollegeCode, pass || null, google_form_url || null, req.params.id
-  ]);
-  res.json({ success: true });
 });
 
 // Role Management
