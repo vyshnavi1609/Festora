@@ -334,37 +334,39 @@ const EventDetailsModal = ({ isOpen, onClose, event, user, onRegister, onSave, o
                 </div>
 
                 <div className="mt-auto space-y-4">
-                  <div className="flex gap-4">
+                  <div className="flex flex-col sm:flex-row gap-4 items-center">
                     <Button 
                       variant="primary"
                       onClick={() => onRegister(event.id)}
-                      className="flex-1 py-5 text-xs"
+                      className="w-full sm:flex-1 py-4 text-sm"
                     >
                       Register Now
                     </Button>
-                    <button 
-                      onClick={() => onSave(event.id)}
-                      className="w-16 h-16 bg-zinc-50 text-zinc-400 hover:text-amber-600 rounded-2xl flex items-center justify-center transition-all border border-zinc-100 active:scale-90"
-                    >
-                      <Bookmark size={24} strokeWidth={2.5} />
-                    </button>
-                    <button 
-                      onClick={() => onMessage(event.created_by)}
-                      className="w-16 h-16 bg-zinc-50 text-zinc-400 hover:text-blue-600 rounded-2xl flex items-center justify-center transition-all border border-zinc-100 active:scale-90"
-                    >
-                      <Send size={24} strokeWidth={2.5} />
-                    </button>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => onSave(event.id)}
+                        className="w-12 h-12 sm:w-16 sm:h-16 bg-zinc-50 text-zinc-400 hover:text-amber-600 rounded-2xl flex items-center justify-center transition-all border border-zinc-100 active:scale-90"
+                      >
+                        <Bookmark size={20} strokeWidth={2.5} />
+                      </button>
+                      <button 
+                        onClick={() => onMessage(event.created_by)}
+                        className="w-12 h-12 sm:w-16 sm:h-16 bg-zinc-50 text-zinc-400 hover:text-blue-600 rounded-2xl flex items-center justify-center transition-all border border-zinc-100 active:scale-90"
+                      >
+                        <Send size={20} strokeWidth={2.5} />
+                      </button>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <button 
                       onClick={addToCalendar}
-                      className="bg-zinc-50 text-zinc-950 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all hover:bg-zinc-100 flex items-center justify-center gap-2 border border-zinc-100"
+                      className="bg-zinc-50 text-zinc-950 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all hover:bg-zinc-100 flex items-center justify-center gap-2 border border-zinc-100"
                     >
                       <CalendarPlus size={18} strokeWidth={2.5} /> Add to Calendar
                     </button>
                     <button 
                       onClick={setReminder}
-                      className="bg-zinc-50 text-zinc-950 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all hover:bg-zinc-100 flex items-center justify-center gap-2 border border-zinc-100"
+                      className="bg-zinc-50 text-zinc-950 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all hover:bg-zinc-100 flex items-center justify-center gap-2 border border-zinc-100"
                     >
                       <BellRing size={18} strokeWidth={2.5} /> Set Reminder
                     </button>
@@ -476,7 +478,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, user, onRegister, onUnregi
         </div>
       </div>
 
-      <div className="aspect-[4/5] w-full bg-zinc-50 relative group overflow-hidden cursor-pointer" onClick={() => onViewDetails(event)}>
+      <div className="w-full bg-zinc-50 relative group overflow-hidden cursor-pointer aspect-[4/5] md:aspect-auto" onClick={() => onViewDetails(event)}>
         <img 
           src={event.image_url || `https://picsum.photos/seed/${event.id}/800/1000`} 
           alt={event.title} 
@@ -489,7 +491,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, user, onRegister, onUnregi
         </div>
       </div>
 
-      <div className="p-8">
+      <div className="p-6 sm:p-8">
         <div className="flex items-center justify-between mb-4">
           <div className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest border shadow-sm ${getCategoryClass(event.category)}`}>
             {event.category || 'Social'}

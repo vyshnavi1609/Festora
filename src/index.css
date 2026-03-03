@@ -75,7 +75,7 @@
 
   /* Layout utilities */
   .container {
-    @apply max-w-4xl mx-auto px-4 sm:px-6;
+    @apply max-w-3xl sm:max-w-4xl lg:max-w-6xl mx-auto px-4 sm:px-6;
   }
 
   .safe-area-bottom {
