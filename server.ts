@@ -330,6 +330,11 @@ const app = express();
 app.use(express.json());
 
 // temporary debug endpoint to verify database connectivity
+// Health check
+app.get("/health", (req, res) => {
+  res.json({ status: "Server is running", timestamp: new Date().toISOString() });
+});
+
 app.get("/debug/users", async (req, res) => {
   try {
     const users = await query("SELECT * FROM users", []);
