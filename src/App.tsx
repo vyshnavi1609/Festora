@@ -2095,7 +2095,7 @@ const ActivityView = ({ user, onViewProfile }: { user: User, onViewProfile: (id:
   );
 };
 
-const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewProfile }: { user: User, targetUserId?: number, onLogout: () => void, onUpdate: (u: User) => void, onBack?: () => void, onViewProfile: (id: number) => void }) => {
+const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewProfile, suggestions, onFollowSuggestion, refreshSuggestions }: { user: User, targetUserId?: number, onLogout: () => void, onUpdate: (u: User) => void, onBack?: () => void, onViewProfile: (id: number) => void, suggestions?: User[], onFollowSuggestion?: (id: number) => void, refreshSuggestions?: () => void }) => {
   const [targetUser, setTargetUser] = useState<User | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [savedEvents, setSavedEvents] = useState<Event[]>([]);
@@ -2269,6 +2269,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
       roll_no: editData.roll_no
     });
     setIsEditing(false);
+    refreshSuggestions && refreshSuggestions();
   };
 
   const handleShare = async () => {
@@ -2287,6 +2288,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
     } catch (err) {
       console.error('Error sharing:', err);
     }
+    refreshSuggestions && refreshSuggestions();
   };
 
   if (profileError) {
@@ -2514,6 +2516,35 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                   Share Profile
                 </button>
               </div>
+              {/* show person suggestions when not editing */}
+              {!isEditing && suggestions && suggestions.length > 0 && (
+                <div className="mt-6">
+                  <h4 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Suggested people</h4>
+                  <div className="space-y-3">
+                    {suggestions.map(s => (
+                      <div key={s.id} className="flex items-center justify-between p-3 bg-white border border-zinc-100 rounded-2xl">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={s.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`}
+                            alt={s.full_name}
+                            className="w-10 h-10 rounded-full"
+                          />
+                          <div>
+                            <p className="font-black text-sm leading-tight">{s.full_name}</p>
+                            <p className="text-[10px] text-zinc-400">@{s.username}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => onFollowSuggestion && onFollowSuggestion(s.id)}
+                          className="px-3 py-1.5 rounded-xl text-[10px] font-black bg-indigo-600 text-white"
+                        >
+                          Follow
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <>
@@ -4202,7 +4233,27 @@ export default function App() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem('festora_user');
-      if (raw) setUser(JSON.parse(raw));
+      if (raw) {
+        const storedUser = JSON.parse(raw);
+        // Verify that the user still exists in the database
+        fetch(`/api/users/${storedUser.id}`)
+          .then(res => {
+            if (res.status === 404) {
+              // User was deleted, clear localStorage and logout
+              localStorage.removeItem('festora_user');
+              setUser(null);
+            } else if (res.ok) {
+              return res.json().then(currentUser => {
+                // User exists, set them as logged in
+                setUser(currentUser);
+              });
+            }
+          })
+          .catch(() => {
+            // If we can't verify, restore the stored user anyway
+            setUser(storedUser);
+          });
+      }
     } catch (e) { /* ignore */ }
 
     // Check for reset password token in URL
@@ -4529,6 +4580,9 @@ export default function App() {
                 onUpdate={setUser} 
                 onBack={() => setViewingProfileId(null)}
                 onViewProfile={handleViewProfile}
+                suggestions={suggestions}
+                onFollowSuggestion={handleFollowSuggestion}
+                refreshSuggestions={fetchSuggestions}
               />
               {['admin', 'council_president', 'club_president'].includes(user.role) && !viewingProfileId && (
                 <AdminDashboard user={user} />
