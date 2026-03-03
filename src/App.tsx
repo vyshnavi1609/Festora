@@ -2157,6 +2157,17 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
         college_name: data.college_name || '',
         roll_no: data.roll_no || ''
       });
+      // if the profile belongs to someone else, fetch any clubs they are part of (useful for role requests)
+      if (!isOwnProfile) {
+        const clubRes = await fetch(`/api/users/${effectiveUserId}/clubs`);
+        if (clubRes.ok) {
+          setProfileClubs(await clubRes.json());
+        } else {
+          setProfileClubs([]);
+        }
+      } else {
+        setProfileClubs([]);
+      }
     } else if (res.status === 403) {
       setProfileError('You cannot view this profile. Only the admin can view admin profiles.');
     } else {
@@ -2215,13 +2226,40 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
 
 
   const sendRoleRequest = async (targetId: number, role: Role) => {
+    /*
+      semantically, the role-requests API expects the *requester* to be the user who has the
+      authority to promote someone, and the *target_user_id* to be the account whose role
+      should change.
+      The profile page previously treated the viewer as the requester, which worked for
+      admin/dashboard flows but not when a student tries to "request" membership from a
+      club president.  In that case the president is the one with authority, so we need to
+      flip the ids and also supply the club_id.
+    */
     try {
+      let body: any = { requester_id: user.id, target_user_id: targetId, requested_role: role };
+
+      // if the viewer is not an authority and is asking to become a club_member, assume
+      // they are requesting membership from a president by clicking on the president's
+      // profile.  swap requester/target and include the clubId if we know it.
+      if (role === 'club_member' && ['student', 'club_member'].includes(user.role)) {
+        // the `targetId` passed here is actually the profile being viewed (president)
+        body.requester_id = targetId;
+        body.target_user_id = user.id;
+        if (profileClubs.length > 0) {
+          // take the first club for simplicity; presidents typically lead one club
+          body.club_id = profileClubs[0].id;
+        }
+      }
+
       const res = await fetch('/api/role-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requester_id: user.id, target_user_id: targetId, requested_role: role })
+        body: JSON.stringify(body)
       });
-      if (!res.ok) throw new Error(`status ${res.status}`);
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`status ${res.status} ${errText}`);
+      }
       alert('Role request sent!');
     } catch (err) {
       console.error('failed to send role request', err);
@@ -2446,12 +2484,12 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
               >
                 {isFollowing ? 'Following' : 'Follow'}
               </button>
-              {targetUser?.role && ['council_president', 'club_president'].includes(targetUser.role) && (
+              {targetUser?.role === 'club_president' && (
                 <button 
                   onClick={() => sendRoleRequest(targetUser.id, 'club_member')}
                   className="flex-1 bg-rose-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all border border-rose-100 active:scale-95"
                 >
-                  Request Role
+                  Request Membership
                 </button>
               )}
               <button 
