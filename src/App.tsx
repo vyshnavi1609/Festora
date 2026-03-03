@@ -3220,9 +3220,10 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
       let data: any = {};
       try { data = await res.json(); } catch (e) { /* ignore non-json */ }
       if (res.ok) {
-        setForgotPasswordMessage('Check email or use: ' + (data.resetUrl?.split('?')[1] || 'link below'));
+        const link = data.resetUrl?.split('?')[1] || '';
+        setForgotPasswordMessage(`Click here: ${data.resetUrl}`);
       } else {
-        setForgotPasswordMessage(data.error || 'Error sending link');
+        setForgotPasswordMessage(data.error || 'Error');
       }
     } catch (err) {
       console.error('forgot-password error', err);
