@@ -283,7 +283,7 @@ const EventDetailsModal = ({ isOpen, onClose, event, user, onRegister, onSave, o
                     className="w-14 h-14 rounded-2xl bg-zinc-100 overflow-hidden border-2 border-zinc-100 shadow-sm cursor-pointer"
                     onClick={() => { onClose(); onViewProfile(event.created_by); }}
                   >
-                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${event.organizer_name}`} alt="organizer" />
+                    <img src={`https://api.dicebear.com/7.x/identicon/svg?seed=${event.organizer_name}`} alt="organizer" />
                   </div>
                   <div>
                     <h4 className="font-black text-zinc-950 tracking-tight">{event.organizer_name}</h4>
@@ -331,37 +331,43 @@ const EventDetailsModal = ({ isOpen, onClose, event, user, onRegister, onSave, o
                     <Button 
                       variant="primary"
                       onClick={() => onRegister(event.id)}
-                      className="w-full sm:flex-1 py-4 text-sm"
+                      className="w-full sm:flex-1 py-3 text-sm flex items-center justify-center gap-2"
+                      aria-label="Register for event"
                     >
-                      Register Now
+                      <CheckCircle2 size={16} />
+                      Register
                     </Button>
                     <div className="flex gap-2">
                       <button 
                         onClick={() => onSave(event.id)}
-                        className="w-12 h-12 sm:w-16 sm:h-16 bg-zinc-50 text-zinc-400 hover:text-amber-600 rounded-2xl flex items-center justify-center transition-all border border-zinc-100 active:scale-90"
+                        className="w-10 h-10 bg-zinc-50 text-zinc-400 hover:text-amber-600 rounded-full flex items-center justify-center transition-all border border-zinc-100 active:scale-90"
+                        aria-label="Save event"
                       >
-                        <Bookmark size={20} strokeWidth={2.5} />
+                        <Bookmark size={18} strokeWidth={2.5} />
                       </button>
                       <button 
                         onClick={() => onMessage(event.created_by)}
-                        className="w-12 h-12 sm:w-16 sm:h-16 bg-zinc-50 text-zinc-400 hover:text-blue-600 rounded-2xl flex items-center justify-center transition-all border border-zinc-100 active:scale-90"
+                        className="w-10 h-10 bg-zinc-50 text-zinc-400 hover:text-blue-600 rounded-full flex items-center justify-center transition-all border border-zinc-100 active:scale-90"
+                        aria-label="Message organizer"
                       >
-                        <Send size={20} strokeWidth={2.5} />
+                        <Send size={18} strokeWidth={2.5} />
                       </button>
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <button 
                       onClick={addToCalendar}
-                      className="bg-zinc-50 text-zinc-950 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all hover:bg-zinc-100 flex items-center justify-center gap-2 border border-zinc-100"
+                      className="py-3 px-3 bg-zinc-50 text-zinc-950 rounded-full flex items-center justify-center gap-2 border border-zinc-100"
+                      aria-label="Add to calendar"
                     >
-                      <CalendarPlus size={18} strokeWidth={2.5} /> Add to Calendar
+                      <CalendarPlus size={16} strokeWidth={2.5} />
                     </button>
                     <button 
                       onClick={setReminder}
-                      className="bg-zinc-50 text-zinc-950 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all hover:bg-zinc-100 flex items-center justify-center gap-2 border border-zinc-100"
+                      className="py-3 px-3 bg-zinc-50 text-zinc-950 rounded-full flex items-center justify-center gap-2 border border-zinc-100"
+                      aria-label="Set reminder"
                     >
-                      <BellRing size={18} strokeWidth={2.5} /> Set Reminder
+                      <BellRing size={16} strokeWidth={2.5} />
                     </button>
                   </div>
                 </div>
@@ -449,7 +455,7 @@ const EventCard: React.FC<EventCardProps> = ({ event, user, onRegister, onUnregi
           onClick={() => onViewProfile(event.created_by)}
         >
           <div className="w-full h-full rounded-[18px] bg-white overflow-hidden border-2 border-white">
-            <img src={organizerAvatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${event.organizer_name}`} alt="organizer" loading="lazy" />
+            <img src={organizerAvatar || `https://api.dicebear.com/7.x/identicon/svg?seed=${event.organizer_name}`} alt="organizer" loading="lazy" />
           </div>
         </div>
         <div className="flex-1 ml-4 cursor-pointer" onClick={() => onViewProfile(event.created_by)}>
@@ -490,22 +496,22 @@ const EventCard: React.FC<EventCardProps> = ({ event, user, onRegister, onUnregi
             {event.category || 'Social'}
           </div>
           <div className="flex items-center gap-6">
-            <div className="flex gap-6">
-              <button onClick={handleLike} className={`transition-all active:scale-90 hover:scale-125 ${isLiked ? 'text-rose-600' : 'text-zinc-950'}`}>
-                <Heart size={30} strokeWidth={2.5} fill={isLiked ? 'currentColor' : 'none'} />
+              <div className="flex gap-3 items-center">
+              <button onClick={handleLike} className={`p-2 rounded-full transition-all active:scale-90 ${isLiked ? 'text-rose-600 bg-rose-50' : 'text-zinc-950 hover:bg-zinc-50'}`} aria-label="Like">
+                <Heart size={18} strokeWidth={2.5} fill={isLiked ? 'currentColor' : 'none'} />
               </button>
-              <button onClick={() => setShowComments(true)} className="text-zinc-950 hover:text-indigo-600 hover:scale-125 transition-all active:scale-90">
-                <MessageCircle size={30} strokeWidth={2.5} />
+              <button onClick={() => setShowComments(true)} className="p-2 rounded-full text-zinc-950 hover:bg-zinc-50 transition-all active:scale-90" aria-label="Comments">
+                <MessageCircle size={18} strokeWidth={2.5} />
               </button>
-              <button onClick={() => onMessage(event.created_by)} className="text-zinc-950 hover:text-blue-600 hover:scale-125 transition-all active:scale-90">
-                <Send size={30} strokeWidth={2.5} />
+              <button onClick={() => onMessage(event.created_by)} className="p-2 rounded-full text-zinc-950 hover:bg-zinc-50 transition-all active:scale-90" aria-label="Message organizer">
+                <Send size={18} strokeWidth={2.5} />
               </button>
-              <button onClick={() => onShare(event)} className="text-zinc-950 hover:text-emerald-600 hover:scale-125 transition-all active:scale-90">
-                <Share2 size={30} strokeWidth={2.5} />
+              <button onClick={() => onShare(event)} className="p-2 rounded-full text-zinc-950 hover:bg-zinc-50 transition-all active:scale-90" aria-label="Share event">
+                <Share2 size={18} strokeWidth={2.5} />
               </button>
             </div>
-            <button onClick={() => onSave(event.id)} className="text-zinc-950 hover:text-amber-600 hover:scale-125 transition-all active:scale-90">
-              <Bookmark size={30} strokeWidth={2.5} />
+            <button onClick={() => onSave(event.id)} className="p-2 rounded-full text-zinc-950 hover:bg-zinc-50 transition-all active:scale-90" aria-label="Save event">
+              <Bookmark size={18} strokeWidth={2.5} />
             </button>
           </div>
         </div>
@@ -532,33 +538,39 @@ const EventCard: React.FC<EventCardProps> = ({ event, user, onRegister, onUnregi
 
           <div className="grid grid-cols-1 gap-4 mt-10">
             {!isRegistered ? (
-              <Button 
-                variant="primary"
-                onClick={() => onRegister(event.id)}
-                className="w-full py-5 text-xs"
-              >
-                Register for Event
-              </Button>
+                <Button 
+                  variant="primary"
+                  onClick={() => onRegister(event.id)}
+                  className="w-full py-3 text-sm flex items-center justify-center gap-2"
+                  aria-label="Register for event"
+                >
+                  <CheckCircle2 size={16} /> Register
+                </Button>
             ) : (
               <div className="grid grid-cols-2 gap-4">
-                <button 
-                  onClick={() => onUnregister(event.id)}
-                  className="bg-rose-50 text-rose-600 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all hover:bg-rose-100 flex items-center justify-center gap-2 border border-rose-100"
-                >
-                  <X size={18} strokeWidth={2.5} /> Unregister
-                </button>
-                <button 
-                  onClick={addToCalendar}
-                  className="bg-zinc-50 text-zinc-950 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all hover:bg-zinc-100 flex items-center justify-center gap-2 border border-zinc-100"
-                >
-                  <CalendarPlus size={18} strokeWidth={2.5} /> Calendar
-                </button>
-                <button 
-                  onClick={setReminder}
-                  className="bg-indigo-600 text-white py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
-                >
-                  <BellRing size={18} strokeWidth={2.5} /> Reminder
-                </button>
+                <div className="grid grid-cols-3 gap-2">
+                  <button 
+                    onClick={() => onUnregister(event.id)}
+                    className="py-3 px-2 bg-rose-50 text-rose-600 rounded-full flex items-center justify-center border border-rose-100"
+                    aria-label="Unregister from event"
+                  >
+                    <X size={16} strokeWidth={2.5} />
+                  </button>
+                  <button 
+                    onClick={addToCalendar}
+                    className="py-3 px-2 bg-zinc-50 text-zinc-950 rounded-full flex items-center justify-center border border-zinc-100"
+                    aria-label="Add to calendar"
+                  >
+                    <CalendarPlus size={16} strokeWidth={2.5} />
+                  </button>
+                  <button 
+                    onClick={setReminder}
+                    className="py-3 px-2 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-lg shadow-indigo-100"
+                    aria-label="Set reminder"
+                  >
+                    <BellRing size={16} strokeWidth={2.5} />
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -620,7 +632,7 @@ const CommentModal = ({ event, user, onClose, onCommentAdded }: { event: Event, 
         {comments.map(comment => (
           <div key={comment.id} className="flex gap-3">
             <div className="w-8 h-8 rounded-full bg-gray-100 overflow-hidden shrink-0">
-              <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.username}`} alt="avatar" />
+              <img src={`https://api.dicebear.com/7.x/identicon/svg?seed=${comment.username}`} alt="avatar" />
             </div>
             <div>
               <p className="text-sm">
@@ -815,6 +827,7 @@ const Stories = ({ user, onViewProfile, onSendMessage }: { user: User, onViewPro
   const [textColor, setTextColor] = useState('#ffffff');
   const [fontSize, setFontSize] = useState<'small' | 'medium' | 'large'>('medium');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [storyVisibility, setStoryVisibility] = useState<'everyone' | 'followers'>('everyone');
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const colors = [
@@ -845,7 +858,8 @@ const Stories = ({ user, onViewProfile, onSendMessage }: { user: User, onViewPro
         content: storyType === 'image' ? selectedImage : storyContent,
         background_color: backgroundColor,
         text_color: textColor,
-        font_size: fontSize
+        font_size: fontSize,
+        visibility: storyVisibility
       })
     });
 
@@ -854,6 +868,7 @@ const Stories = ({ user, onViewProfile, onSendMessage }: { user: User, onViewPro
       setStoryContent('');
       setSelectedImage(null);
       setStoryType('text');
+      setStoryVisibility('everyone');
       fetchStories();
     }
   };
@@ -1211,10 +1226,30 @@ const Stories = ({ user, onViewProfile, onSendMessage }: { user: User, onViewPro
                   </div>
                 )}
 
+                {/* Visibility Toggle */}
+                <div className="mb-6">
+                  <p className="text-sm font-black text-zinc-700 mb-3">Who can see this?</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setStoryVisibility('everyone')}
+                      className={`flex-1 py-2 px-3 rounded-xl text-sm font-black ${storyVisibility === 'everyone' ? 'bg-indigo-600 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
+                    >
+                      Everyone
+                    </button>
+                    <button
+                      onClick={() => setStoryVisibility('followers')}
+                      className={`flex-1 py-2 px-3 rounded-xl text-sm font-black ${storyVisibility === 'followers' ? 'bg-indigo-600 text-white' : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'}`}
+                    >
+                      Followers
+                    </button>
+                  </div>
+                </div>
+
                 <button 
                   onClick={createStory}
                   disabled={(storyType === 'text' && !storyContent.trim()) || (storyType === 'image' && !selectedImage)}
-                  className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full py-3 bg-indigo-600 text-white rounded-2xl font-black disabled:opacity-50 disabled:cursor-not-allowed"
+                  aria-label="Share story"
                 >
                   Share Story
                 </button>
@@ -1961,8 +1996,8 @@ const CreateEventView = ({ user, onCreated, editingEvent, onCancel }: { user: Us
             </label>
           </div>
 
-        <button type="submit" className="btn-primary w-full py-5 shadow-2xl shadow-indigo-100 flex items-center justify-center gap-2">
-          {editingEvent ? <><Edit3 size={18} strokeWidth={3} /> Update Event</> : <><PlusSquare size={18} strokeWidth={3} /> Post Event</>}
+        <button type="submit" className="btn-primary w-full py-3 shadow-2xl shadow-indigo-100 flex items-center justify-center gap-2" aria-label={editingEvent ? 'Update event' : 'Post event'}>
+          {editingEvent ? <><Edit3 size={16} strokeWidth={3} /> Update</> : <><PlusSquare size={16} strokeWidth={3} /> Post</>}
         </button>
       </form>
     </div>
@@ -2055,7 +2090,7 @@ const UserListModal = ({ title, users, onClose, onViewProfile }: { title: string
           <div key={u.id} className="flex items-center justify-between p-4 bg-zinc-50 rounded-[24px] border border-zinc-100">
             <div className="flex items-center gap-4 cursor-pointer" onClick={() => { onViewProfile(u.id); onClose(); }}>
               <div className="w-12 h-12 rounded-2xl bg-white overflow-hidden border border-zinc-200 shadow-sm">
-                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${u.username}`} alt="avatar" />
+                <img src={`https://api.dicebear.com/7.x/identicon/svg?seed=${u.username}`} alt="avatar" />
               </div>
               <div>
                 <p className="font-black text-sm text-zinc-950">{u.full_name}</p>
@@ -2177,7 +2212,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
   });
 
   const avatars = [
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
+    'https://api.dicebear.com/7.x/identicon/svg?seed=Felix',
     'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka',
     'https://api.dicebear.com/7.x/avataaars/svg?seed=Jasper',
     'https://api.dicebear.com/7.x/avataaars/svg?seed=Milo',
@@ -2196,7 +2231,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
       setEditData({
         bio: data.bio || '',
         social_links: data.social_links ? JSON.parse(data.social_links) : { instagram: '', twitter: '', linkedin: '', website: '' },
-        avatar_url: data.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${data.username}`,
+        avatar_url: data.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${data.username}`,
         college_name: data.college_name || '',
         roll_no: data.roll_no || ''
       });
@@ -2571,7 +2606,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                       <div key={s.id} className="flex items-center justify-between p-3 bg-white border border-zinc-100 rounded-2xl">
                         <div className="flex items-center gap-3">
                           <img
-                            src={s.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`}
+                            src={s.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${s.username}`}
                             alt={s.full_name}
                             className="w-10 h-10 rounded-full"
                           />
@@ -2582,9 +2617,10 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                         </div>
                         <button
                           onClick={() => onFollowSuggestion && onFollowSuggestion(s.id)}
-                          className="px-3 py-1.5 rounded-xl text-[10px] font-black bg-indigo-600 text-white"
+                          className="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center"
+                          aria-label={`Follow ${s.full_name}`}
                         >
-                          Follow
+                          <UserPlus size={14} />
                         </button>
                       </div>
                     ))}
@@ -2610,9 +2646,10 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
               )}
               <button 
                 onClick={handleShare}
-                className="flex-1 bg-zinc-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-100 transition-all border border-zinc-100 active:scale-95"
+                className="w-10 h-10 bg-zinc-50 rounded-full flex items-center justify-center hover:bg-zinc-100 transition-all"
+                aria-label="Share profile"
               >
-                Share Profile
+                <Share2 size={16} />
               </button>
             </>
           )}
@@ -2625,12 +2662,13 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
           >
             <Calendar size={22} strokeWidth={activeTab === 'posts' ? 2.5 : 2} />
             {activeTab === 'posts' && <motion.div layoutId="profileTab" className="absolute top-0 left-0 right-0 h-0.5 bg-zinc-900" />}
-          </button>
-          <button 
-            onClick={() => setActiveTab('saved')}
-            className={`flex-1 py-4 flex justify-center relative ${activeTab === 'saved' ? 'text-zinc-900' : 'text-zinc-300'}`}
-          >
-            <Bookmark size={22} strokeWidth={activeTab === 'saved' ? 2.5 : 2} />
+              <button 
+                onClick={handleShare}
+                className="w-10 h-10 bg-zinc-50 rounded-full flex items-center justify-center hover:bg-zinc-100 transition-all"
+                aria-label="Share profile"
+              >
+                <Share2 size={16} />
+              </button>
             {activeTab === 'saved' && <motion.div layoutId="profileTab" className="absolute top-0 left-0 right-0 h-0.5 bg-zinc-900" />}
           </button>
         </div>
@@ -3004,7 +3042,7 @@ const AdminDashboard = ({ user }: { user: User }) => {
               <div key={u.id} className="flex items-center justify-between p-4 bg-white rounded-3xl border border-zinc-100 shadow-sm">
                 <div className="flex items-center">
                   <div className="w-12 h-12 rounded-2xl bg-zinc-100 overflow-hidden mr-4 border border-zinc-200">
-                    <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${u.username}`} alt="avatar" />
+                    <img src={`https://api.dicebear.com/7.x/identicon/svg?seed=${u.username}`} alt="avatar" />
                   </div>
                   <div>
                     <p className="text-sm font-black text-zinc-950">{u.full_name}</p>
@@ -3124,7 +3162,7 @@ const MessagesView = ({ user, onBack }: { user: User, onBack?: () => void }) => 
             <ChevronLeft size={28} />
           </button>
           <div className="w-10 h-10 rounded-2xl bg-zinc-100 overflow-hidden mr-3 border border-zinc-200 shadow-sm">
-            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${selectedUser.username}`} alt="avatar" />
+            <img src={`https://api.dicebear.com/7.x/identicon/svg?seed=${selectedUser.username}`} alt="avatar" />
           </div>
           <div>
             <h2 className="font-black text-sm text-zinc-900 leading-tight">{selectedUser.full_name}</h2>
@@ -3186,7 +3224,7 @@ const MessagesView = ({ user, onBack }: { user: User, onBack?: () => void }) => 
             className="w-full flex items-center p-4 bg-white border border-zinc-100 rounded-[32px] hover:bg-zinc-50 transition-all active:scale-[0.98] shadow-sm"
           >
             <div className="w-14 h-14 rounded-2xl bg-zinc-100 overflow-hidden mr-4 border border-zinc-200 shadow-sm">
-              <img src={u.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.username}`} alt="avatar" />
+              <img src={u.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${u.username}`} alt="avatar" />
             </div>
             <div className="text-left flex-1">
               <p className="font-black text-zinc-950 text-sm">{u.full_name}</p>
@@ -3373,7 +3411,7 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
   );
 
   const avatars = [
-    'https://api.dicebear.com/7.x/avataaars/svg?seed=Felix',
+    'https://api.dicebear.com/7.x/identicon/svg?seed=Felix',
     'https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka',
     'https://api.dicebear.com/7.x/avataaars/svg?seed=Jasper',
     'https://api.dicebear.com/7.x/avataaars/svg?seed=Milo',

@@ -198,11 +198,15 @@ async function initializeDatabase() {
         background_color VARCHAR(7) DEFAULT '#000000',
         text_color VARCHAR(7) DEFAULT '#FFFFFF',
         font_size VARCHAR(50) DEFAULT 'medium',
+        visibility VARCHAR(50) DEFAULT 'everyone',
         expires_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(user_id) REFERENCES users(id)
       )
     `);
+    
+    // Add visibility column if it doesn't exist (for older databases)
+    await execute(`ALTER TABLE stories ADD COLUMN IF NOT EXISTS visibility VARCHAR(50) DEFAULT 'everyone'`);
 
     await execute(`
       CREATE TABLE IF NOT EXISTS story_views (
@@ -1663,24 +1667,35 @@ app.get("/api/follows/following/:userId", async (req, res) => {
 
 // Stories
 app.post("/api/stories", async (req, res) => {
-  const { content_type, content, background_color, text_color, font_size } = req.body;
+  const { content_type, content, background_color, text_color, font_size, visibility } = req.body;
+  // Get user_id from session or request (fallback to 1 only for dev)
+  const userId = (req as any).user?.id || (req as any).session?.userId || 1;
+  
+  if (!content_type || !content) {
+    return res.status(400).json({ error: "Content type and content are required" });
+  }
+  
   const expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
   
-  const result = await queryOne(`
-    INSERT INTO stories (user_id, content_type, content, background_color, text_color, font_size, expires_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
-    RETURNING id
-  `, [(req as any).user?.id || 1, content_type, content, background_color, text_color, font_size, expires_at.toISOString()]);
-  
-  res.json({ id: result.id });
+  try {
+    const result = await queryOne(`
+      INSERT INTO stories (user_id, content_type, content, background_color, text_color, font_size, visibility, expires_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id
+    `, [userId, content_type, content, background_color || '#000000', text_color || '#FFFFFF', font_size || 'medium', visibility || 'everyone', expires_at.toISOString()]);
+    
+    res.json({ id: result.id, message: "Story created successfully" });
+  } catch (e) {
+    console.error('Story creation error:', e);
+    res.status(500).json({ error: "Failed to create story" });
+  }
 });
 
 app.get("/api/stories", async (req, res) => {
   const userId = req.query.userId || (req as any).user?.id || 1;
-  const requester = await queryOne("SELECT role FROM users WHERE id = $1", [userId]);
   
   // Get stories from users this user follows, plus their own stories
-  // Exclude admin stories for non-admin users
+  // Respect visibility settings: 'everyone' visible to all, 'followers' only to followers
   const stories = await query(`
   SELECT s.*, u.username, u.full_name, u.avatar_url,
          COUNT(sv.id) as view_count,
@@ -1690,10 +1705,16 @@ app.get("/api/stories", async (req, res) => {
   LEFT JOIN story_views sv ON s.id = sv.story_id
   LEFT JOIN story_views sv2 ON s.id = sv2.story_id AND sv2.viewer_id = $1
   WHERE s.expires_at > NOW()
-  AND (s.user_id = $2 OR s.user_id IN (
-    SELECT following_id FROM follows WHERE follower_id = $3
-  ))
-  AND (u.role != 'admin' OR s.user_id = $4)
+  AND (
+    -- Can see own stories
+    s.user_id = $2 
+    -- OR stories from people you follow (respect visibility)
+    OR (s.user_id IN (SELECT following_id FROM follows WHERE follower_id = $3)
+      AND s.visibility IN ('everyone', 'followers'))
+    -- OR public stories from anyone else
+    OR (s.visibility = 'everyone')
+  )
+  AND u.role != 'admin'
   GROUP BY 
     s.id,
     u.username,
@@ -1701,7 +1722,7 @@ app.get("/api/stories", async (req, res) => {
     u.avatar_url,
     sv2.viewer_id
   ORDER BY s.created_at DESC
-`, [userId, userId, userId, userId]);
+`, [userId, userId, userId]);
   
   res.json(stories);
 });
