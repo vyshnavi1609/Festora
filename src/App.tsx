@@ -3335,30 +3335,52 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
 
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    const endpoint = isLogin ? '/api/login' : '/api/register';
-    const payload = isLogin
-      ? { identifier: formData.identifier, password: formData.password }
-      : {
-          username: formData.username,
-          email: formData.email,
-          phone_number: formData.phone_number,
-          password: formData.password,
-          full_name: formData.full_name,
-          avatar_url: formData.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${formData.username}`,
-          college_name: formData.college_name === 'Others' ? customCollegeName : formData.college_name,
-          roll_no: formData.roll_no
-        };
+    
+    try {
+      // Validate all required fields for signup
+      if (!isLogin) {
+        if (!formData.username || !formData.email || !formData.phone_number || !formData.password || !formData.full_name || !formData.college_name || !formData.roll_no) {
+          setError('Please fill all required fields');
+          console.error('Missing fields:', { formData, customCollegeName });
+          return;
+        }
+      }
 
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
-    if (res.ok) {
-      onLogin(data);
-    } else {
-      setError(data.error);
+      const endpoint = isLogin ? '/api/login' : '/api/register';
+      const payload = isLogin
+        ? { identifier: formData.identifier, password: formData.password }
+        : {
+            username: formData.username,
+            email: formData.email,
+            phone_number: formData.phone_number,
+            password: formData.password,
+            full_name: formData.full_name,
+            avatar_url: formData.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${formData.username}`,
+            college_name: formData.college_name === 'Others' ? customCollegeName : formData.college_name,
+            roll_no: formData.roll_no
+          };
+
+      console.log('Submitting form to', endpoint, 'with payload:', isLogin ? { identifier: payload.identifier, password: '***' } : { ...payload, password: '***' });
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await res.json();
+      console.log('Response status:', res.status, 'data:', data);
+      
+      if (res.ok) {
+        console.log('Login/Register successful, user:', data);
+        onLogin(data);
+      } else {
+        console.error('Login/Register failed:', data.error);
+        setError(data.error || 'An error occurred. Please try again.');
+      }
+    } catch (err) {
+      console.error('handleSubmit error:', err);
+      setError('An error occurred. Please check your connection and try again.');
     }
   };
 
