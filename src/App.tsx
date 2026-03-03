@@ -2600,7 +2600,10 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
               {/* show person suggestions when not editing */}
               {!isEditing && suggestions && suggestions.length > 0 && (
                 <div className="mt-6">
-                  <h4 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Suggested people</h4>
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-black uppercase tracking-widest text-zinc-500">Discover people</h4>
+                    <button className="text-xs font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700">See all</button>
+                  </div>
                   <div className="space-y-3">
                     {suggestions.map(s => (
                       <div key={s.id} className="flex items-center justify-between p-3 bg-white border border-zinc-100 rounded-2xl">
