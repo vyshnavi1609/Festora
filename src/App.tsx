@@ -1259,10 +1259,9 @@ const DiscoverView = ({ events, user, onViewDetails }: { events: Event[], user: 
   );
 };
 
-const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, onEdit, onRefresh, setActiveTab, unreadCount, onViewProfile, onViewDetails, onSendMessage }: { events: Event[], user: User, onRegister: (id: number) => void, onUnregister: (id: number) => void, onSave: (id: number) => void, onMessage: (id: number) => void, onEdit: (event: Event) => void, onRefresh: () => void, setActiveTab: (t: string) => void, unreadCount: number, onViewProfile: (userId: number) => void, onViewDetails: (event: Event) => void, onSendMessage?: (receiverId: number, content: string) => void }) => {
+const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, onEdit, onRefresh, setActiveTab, unreadCount, onViewProfile, onViewDetails, onSendMessage, pendingRequests, suggestions, onFollowSuggestion }: { events: Event[], user: User, onRegister: (id: number) => void, onUnregister: (id: number) => void, onSave: (id: number) => void, onMessage: (id: number) => void, onEdit: (event: Event) => void, onRefresh: () => void, setActiveTab: (t: string) => void, unreadCount: number, onViewProfile: (userId: number) => void, onViewDetails: (event: Event) => void, onSendMessage?: (receiverId: number, content: string) => void, pendingRequests?: any[], suggestions?: User[], onFollowSuggestion?: (id: number) => void }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [registeredEventIds, setRegisteredEventIds] = useState<number[]>([]);
-  const [suggestions, setSuggestions] = useState<User[]>([]);
   const [showCalendar, setShowCalendar] = useState(false);
   const [likedEventIds, setLikedEventIds] = useState<number[]>([]);
 
@@ -1330,9 +1329,68 @@ const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, o
         </div>
       </header>
 
+      {/* Pending Requests for Council President */}
+      {user.role === 'council_president' && pendingRequests && pendingRequests.length > 0 && (
+        <div className="mb-6 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-3xl p-6 border border-emerald-100 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-black text-zinc-950 flex items-center gap-2">
+              <CheckCircle2 size={20} className="text-emerald-600" />
+              Pending Club Requests
+            </h3>
+            <span className="bg-emerald-600 text-white px-3 py-1 rounded-full text-[11px] font-black">{pendingRequests.length}</span>
+          </div>
+          <div className="space-y-3">
+            {pendingRequests.slice(0, 3).map(req => (
+              <div key={req.id} className="bg-white rounded-2xl p-4 border border-emerald-100 flex items-start justify-between">
+                <div className="flex-1">
+                  <p className="font-black text-sm text-zinc-900 mb-1">{req.club_name || 'Club Request'}</p>
+                  <p className="text-[10px] text-zinc-500 mb-2">by <span className="font-black text-zinc-700">{req.requester_name}</span></p>
+                  <p className="text-[10px] text-zinc-600 line-clamp-2">{req.club_description}</p>
+                </div>
+                <button 
+                  onClick={() => setActiveTab('club-requests')}
+                  className="ml-4 bg-emerald-600 text-white px-4 py-2 rounded-xl text-[10px] font-black whitespace-nowrap hover:bg-emerald-700 transition-all active:scale-95"
+                >
+                  Review
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Stories Component */}
       <Stories user={user} onViewProfile={onViewProfile} onSendMessage={onSendMessage} />
       
+      {/* Discover People Section (compact) */}
+      {suggestions && suggestions.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-3">Discover people</h3>
+          <div className="flex gap-3">
+            {suggestions.slice(0, 4).map(s => (
+              <div key={s.id} className="flex-shrink-0 w-20 text-center">
+                <button onClick={() => onViewProfile(s.id)} className="flex flex-col items-center gap-2">
+                  <div className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center border-2 border-white shadow-sm" style={{background: s.avatar_url ? 'transparent' : 'linear-gradient(135deg,#e9d5ff,#c7d2fe)'}}>
+                    {s.avatar_url ? (
+                                  <img src={s.avatar_url} alt={s.full_name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <img src={`https://api.dicebear.com/7.x/identicon/svg?seed=${s.username}`} alt={s.full_name} className="w-full h-full object-cover" />
+                                )}
+                  </div>
+                  <p className="font-black text-[11px] leading-tight text-zinc-900 truncate w-full">{s.full_name.split(' ')[0]}</p>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onFollowSuggestion && onFollowSuggestion(s.id); }}
+                  className="mt-2 mx-auto w-8 h-8 text-white rounded-full bg-indigo-600 flex items-center justify-center hover:bg-indigo-700 transition-colors"
+                >
+                  <UserPlus size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {events.length === 0 && (
           <div className="col-span-1 md:col-span-2 py-20 text-center text-zinc-400">
@@ -2323,8 +2381,12 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
         <div className="ml-auto flex gap-6 text-zinc-950">
           {isOwnProfile && (
             <>
-              <button onClick={onNavigateCreate} className="cursor-pointer hover:text-indigo-600 transition-all active:scale-90"><PlusSquare size={26} strokeWidth={2.5} /></button>
-              <button onClick={onLogout} className="hover:text-indigo-600 transition-all active:scale-90"><Settings size={26} strokeWidth={2.5} /></button>
+              <button onClick={onNavigateCreate} className="p-2 w-10 h-10 rounded-full bg-zinc-50 flex items-center justify-center hover:bg-indigo-50 active:scale-95 transition-colors">
+                <PlusSquare size={18} strokeWidth={3} className="text-indigo-700" />
+              </button>
+              <button onClick={onLogout} className="p-2 w-10 h-10 rounded-full bg-zinc-50 flex items-center justify-center hover:bg-indigo-50 active:scale-95 transition-colors">
+                <Settings size={18} strokeWidth={3} className="text-zinc-700" />
+              </button>
             </>
           )}
         </div>
@@ -2334,7 +2396,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
         <div className="flex items-center mb-10">
           <div className="w-28 h-28 rounded-[40px] vibrant-gradient p-1 shadow-2xl shadow-indigo-100">
             <div className="w-full h-full rounded-[36px] bg-white overflow-hidden border-4 border-white">
-              <img src={targetUser.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${targetUser.username}`} alt="profile" loading="lazy" />
+              <img src={targetUser.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${targetUser.username}`} alt="profile" loading="lazy" />
             </div>
           </div>
           <div className="flex-1 flex justify-around ml-8">
@@ -2354,34 +2416,27 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
         </div>
         {profileSuggestions.length > 0 && (
           <div className="mb-8">
-            <h4 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-4">Discover people</h4>
-            <div className="grid grid-cols-2 gap-3">
+            <h4 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-3">Discover people</h4>
+            <div className="flex gap-3">
               {profileSuggestions.slice(0, 4).map(s => (
-                <motion.div
-                  key={s.id}
-                  whileHover={{ y: -4 }}
-                  onClick={() => onViewProfile(s.id)}
-                  className="p-4 bg-white border border-zinc-100 rounded-3xl cursor-pointer hover:shadow-lg transition-all"
-                >
-                  <div className="w-full aspect-square rounded-2xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center mb-3 overflow-hidden">
-                    <img
-                      src={s.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`}
-                      alt={s.full_name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <p className="font-black text-sm leading-tight text-zinc-900 truncate">{s.full_name}</p>
-                  <p className="text-[10px] text-zinc-400 mb-3">@{s.username}</p>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onFollowSuggestion && onFollowSuggestion(s.id);
-                    }}
-                    className="w-full px-3 py-2.5 rounded-xl text-[10px] font-black bg-indigo-600 text-white hover:bg-indigo-700 transition-all active:scale-95"
-                  >
-                    Follow
+                <div key={s.id} className="flex-shrink-0 w-20 text-center">
+                  <button onClick={() => onViewProfile(s.id)} className="flex flex-col items-center gap-2">
+                    <div className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center border-2 border-white shadow-sm" style={{background: s.avatar_url ? 'transparent' : 'linear-gradient(135deg,#fde68a,#fbcfe8)'}}>
+                      {s.avatar_url ? (
+                        <img src={s.avatar_url} alt={s.full_name} className="w-full h-full object-cover" />
+                      ) : (
+                        <img src={`https://api.dicebear.com/7.x/identicon/svg?seed=${s.username}`} alt={s.full_name} className="w-full h-full object-cover" />
+                      )}
+                    </div>
+                    <p className="font-black text-[11px] leading-tight text-zinc-900 truncate w-full">{s.full_name.split(' ')[0]}</p>
                   </button>
-                </motion.div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onFollowSuggestion && onFollowSuggestion(s.id); }}
+                    className="mt-2 mx-auto w-8 h-8 text-white rounded-full bg-indigo-600 flex items-center justify-center hover:bg-indigo-700 transition-colors"
+                  >
+                    <UserPlus size={14} />
+                  </button>
+                </div>
               ))}
             </div>
           </div>
@@ -4796,6 +4851,7 @@ export default function App() {
   const [previousTab, setPreviousTab] = useState<string>('home');
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
   const [showClubRequestModal, setShowClubRequestModal] = useState(false);
+  const [clubRequests, setClubRequests] = useState<any[]>([]);
 
   const fetchEvents = () => {
     const url = user?.college_name ? `/api/events?college_code=${encodeURIComponent(user.college_name)}` : '/api/events';
@@ -4840,6 +4896,15 @@ export default function App() {
     }
   };
 
+  const fetchClubRequests = () => {
+    if (user && user.role === 'council_president' && user.college_name) {
+      fetch(`/api/club-requests?collegeCode=${encodeURIComponent(user.college_name)}&status=pending`)
+        .then(res => res.json())
+        .then(setClubRequests)
+        .catch(() => setClubRequests([]));
+    }
+  };
+
   useEffect(() => {
     if (user) {
       fetchEvents();
@@ -4848,9 +4913,11 @@ export default function App() {
       fetchSuggestions();
       fetchBookmarks();
       fetchLikes();
+      fetchClubRequests();
       const interval = setInterval(() => {
         fetchNotifications();
         fetchRegistrations();
+        fetchClubRequests();
       }, 10000);
       return () => clearInterval(interval);
     }
@@ -5027,6 +5094,9 @@ export default function App() {
               unreadCount={unreadCount}
               onViewProfile={handleViewProfile}
               onViewDetails={setViewingEvent}
+              pendingRequests={user.role === 'council_president' ? clubRequests : undefined}
+              suggestions={suggestions}
+              onFollowSuggestion={handleFollowSuggestion}
             />
           )}
           {activeTab === 'discover' && (
