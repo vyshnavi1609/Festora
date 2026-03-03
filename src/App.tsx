@@ -2675,6 +2675,23 @@ const AdminDashboard = ({ user }: { user: User }) => {
     fetchData();
   };
 
+  const handleDeleteUser = async (targetId: number, targetName: string) => {
+    if (!window.confirm(`Are you sure you want to delete ${targetName}? This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`/api/users/${targetId}?requester=${user.id}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      alert(`${targetName} has been deleted from the database.`);
+      fetchData();
+    } catch (err) {
+      console.error('delete user failed', err);
+      alert('Failed to delete user');
+    }
+  };
+
   return (
     <div className="pb-24 pt-6 px-6 max-w-md mx-auto">
       <div className="flex items-center justify-between mb-8">
@@ -2845,7 +2862,7 @@ const AdminDashboard = ({ user }: { user: User }) => {
                       <UserPlus size={18} />
                     </button>
                   )}
-                  <button className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors shadow-sm">
+                  <button onClick={() => handleDeleteUser(u.id, u.full_name)} className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors shadow-sm">
                     <Trash2 size={18} />
                   </button>
                 </div>
@@ -3553,9 +3570,16 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
                 required
               />
               {forgotPasswordMessage && (
-                <p className={`text-[10px] text-center font-black uppercase tracking-widest ${forgotPasswordMessage.includes('sent') ? 'text-green-600' : 'text-red-500'}`}>
-                  {forgotPasswordMessage}
-                </p>
+                <div className="space-y-3">
+                  <p className={`text-[10px] text-center font-black uppercase tracking-widest ${forgotPasswordMessage.includes('Click') ? 'text-green-600' : 'text-red-500'}`}>
+                    {forgotPasswordMessage.includes('http') ? 'Link ready:' : forgotPasswordMessage}
+                  </p>
+                  {forgotPasswordMessage.includes('http') && (
+                    <a href={forgotPasswordMessage.split('Click here: ')[1]} className="btn-primary w-full py-3 text-center text-xs block">
+                      Open Reset Link
+                    </a>
+                  )}
+                </div>
               )}
               <div className="flex gap-3">
                 <button 
@@ -4075,22 +4099,12 @@ export default function App() {
       if (raw) setUser(JSON.parse(raw));
     } catch (e) { /* ignore */ }
 
-    // automatically clear the stored user when the page is unloaded/closed
-    const handleUnload = () => {
-      localStorage.removeItem('festora_user');
-    };
-    window.addEventListener('beforeunload', handleUnload);
-
     // Check for reset password token in URL
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
     if (token) {
       setResetPasswordToken(token);
     }
-
-    return () => {
-      window.removeEventListener('beforeunload', handleUnload);
-    };
   }, []);
 
   useEffect(() => {
