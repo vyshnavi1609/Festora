@@ -3220,17 +3220,9 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
       let data: any = {};
       try { data = await res.json(); } catch (e) { /* ignore non-json */ }
       if (res.ok) {
-        let msg = 'Password reset email sent! Check your inbox.';
-        if (data.resetUrl) {
-          msg += `\nLink: ${data.resetUrl}`;
-        }
-        setForgotPasswordMessage(msg);
+        setForgotPasswordMessage('Check email or use: ' + (data.resetUrl?.split('?')[1] || 'link below'));
       } else {
-        let msg = data.error || 'Failed to send reset email';
-        if (data.resetUrl) {
-          msg += `\nLink: ${data.resetUrl}`;
-        }
-        setForgotPasswordMessage(msg);
+        setForgotPasswordMessage(data.error || 'Error sending link');
       }
     } catch (err) {
       console.error('forgot-password error', err);

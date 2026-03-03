@@ -515,15 +515,10 @@ app.post("/api/forgot-password", async (req, res) => {
     to: email,
     subject: 'Password Reset - Festora',
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2 style="color: #6366f1;">Reset Your Password</h2>
-        <p>Hello ${user.full_name},</p>
-        <p>You requested a password reset for your Festora account. Click the button below to reset your password:</p>
-        <a href="${resetUrl}" style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 16px 0;">Reset Password</a>
-        <p>This link will expire in 1 hour.</p>
-        <p>If you didn't request this password reset, please ignore this email.</p>
-        <p>Best regards,<br>The Festora Team</p>
-      </div>
+      <p>Hi ${user.full_name},</p>
+      <p>Click the link below to reset your password:</p>
+      <a href="${resetUrl}">Reset Password</a>
+      <p>Link expires in 1 hour.</p>
     `
   };
   
