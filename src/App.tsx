@@ -2109,6 +2109,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
   const [followingList, setFollowingList] = useState<User[]>([]);
   const [profileClubs, setProfileClubs] = useState<any[]>([]);
   const [userEventsCount, setUserEventsCount] = useState(0);
+  const [profileSuggestions, setProfileSuggestions] = useState<User[]>([]);
   const [editData, setEditData] = useState({
     bio: '',
     social_links: { instagram: '', twitter: '', linkedin: '', website: '' },
@@ -2187,9 +2188,17 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
       .then(setFollowingList);
   };
 
+  const fetchProfileSuggestions = () => {
+    fetch(`/api/users/suggestions/${effectiveUserId}`)
+      .then(res => res.json())
+      .then(setProfileSuggestions)
+      .catch(() => setProfileSuggestions([]));
+  };
+
   useEffect(() => {
     fetchProfileData();
     fetchFollowData();
+    fetchProfileSuggestions();
     fetch(`/api/saved-events/${effectiveUserId}`)
       .then(res => res.json())
       .then(setSavedEvents);
@@ -2343,56 +2352,38 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
             </div>
           </div>
         </div>
-        {(followersList.length > 0 || followingList.length > 0) && (
-          <div className="mb-8 space-y-4">
-            {followersList.length > 0 && (
-              <div>
-                <h4 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Followers</h4>
-                <div className="flex gap-2 overflow-x-auto no-scrollbar">
-                  {followersList.slice(0,10).map(u => (
+        {profileSuggestions.length > 0 && (
+          <div className="mb-8">
+            <h4 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-4">Discover people</h4>
+            <div className="grid grid-cols-2 gap-3">
+              {profileSuggestions.slice(0, 4).map(s => (
+                <motion.div
+                  key={s.id}
+                  whileHover={{ y: -4 }}
+                  onClick={() => onViewProfile(s.id)}
+                  className="p-4 bg-white border border-zinc-100 rounded-3xl cursor-pointer hover:shadow-lg transition-all"
+                >
+                  <div className="w-full aspect-square rounded-2xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center mb-3 overflow-hidden">
                     <img
-                      key={u.id}
-                      src={u.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.username}`}
-                      alt={u.full_name}
-                      className="w-10 h-10 rounded-full"
-                      onClick={() => { onViewProfile(u.id); }}
+                      src={s.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`}
+                      alt={s.full_name}
+                      className="w-full h-full object-cover"
                     />
-                  ))}
-                  {followersList.length > 10 && (
-                    <button
-                      onClick={() => { fetchFollowersList(); setShowFollowers(true); }}
-                      className="text-[10px] font-bold ml-2"
-                    >
-                      View more
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-            {followingList.length > 0 && (
-              <div>
-                <h4 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Following</h4>
-                <div className="flex gap-2 overflow-x-auto no-scrollbar">
-                  {followingList.slice(0,10).map(u => (
-                    <img
-                      key={u.id}
-                      src={u.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.username}`}
-                      alt={u.full_name}
-                      className="w-10 h-10 rounded-full"
-                      onClick={() => { onViewProfile(u.id); }}
-                    />
-                  ))}
-                  {followingList.length > 10 && (
-                    <button
-                      onClick={() => { fetchFollowingList(); setShowFollowing(true); }}
-                      className="text-[10px] font-bold ml-2"
-                    >
-                      View more
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
+                  </div>
+                  <p className="font-black text-sm leading-tight text-zinc-900 truncate">{s.full_name}</p>
+                  <p className="text-[10px] text-zinc-400 mb-3">@{s.username}</p>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onFollowSuggestion && onFollowSuggestion(s.id);
+                    }}
+                    className="w-full px-3 py-2.5 rounded-xl text-[10px] font-black bg-indigo-600 text-white hover:bg-indigo-700 transition-all active:scale-95"
+                  >
+                    Follow
+                  </button>
+                </motion.div>
+              ))}
+            </div>
           </div>
         )}
         

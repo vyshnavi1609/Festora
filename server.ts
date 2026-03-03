@@ -1035,15 +1035,46 @@ app.post("/api/role-requests", async (req, res) => {
     const result = await queryOne("INSERT INTO role_requests (requester_id, target_user_id, requested_role, club_id) VALUES ($1, $2, $3, $4) RETURNING id", [
       requester_id, target_user_id, requested_role, club_id || null]);
 
-    // notify the approver (requester_id) that a new request needs action
-    await execute("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [
-      requester_id,
-      `New promotion request for ${requested_role.replace('_',' ')}`,
-      'role_request',
-      `/profile/${target_user_id}`
-    ]);
-    
-    // Send email notification
+    // Determine who should approve this request and notify them.
+    // For club_president promotions the approver is the council_president for the club's college.
+    let approverIds: number[] = [];
+    if (requested_role === 'club_president' && club_id) {
+      const clubInfo = await queryOne("SELECT college_code FROM clubs WHERE id = $1", [club_id]);
+      if (clubInfo && clubInfo.college_code) {
+        const approvers = await query("SELECT id, email, full_name FROM users WHERE role = 'council_president' AND LOWER(college_name) = LOWER($1)", [clubInfo.college_code]);
+        approverIds = approvers.map((a: any) => a.id);
+        for (const ap of approvers) {
+          await execute("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [
+            ap.id,
+            `Approval requested: promote ${targetUser.full_name} to club president for ${clubInfo.college_code}`,
+            'role_request',
+            `/role-requests/${result.id}`
+          ]);
+          if (ap.email) {
+            try {
+              await emailTransporter.sendMail({
+                from: process.env.EMAIL_FROM,
+                to: ap.email,
+                subject: `Approval needed: Club President request for ${targetUser.full_name}`,
+                html: `<p>Hi ${ap.full_name},</p><p>${requester.full_name} has requested that <strong>${targetUser.full_name}</strong> be made Club President for a club in your college (${clubInfo.college_code}). Please review and approve or reject the request in Festora.</p>`
+              });
+            } catch (emailError) {
+              console.error('Failed to send approver email:', emailError);
+            }
+          }
+        }
+      }
+    } else {
+      // For other promotions notify the requester (fallback) and the target user
+      await execute("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [
+        requester_id,
+        `New promotion request for ${requested_role.replace('_',' ')}`,
+        'role_request',
+        `/profile/${target_user_id}`
+      ]);
+    }
+
+    // Notify target user that a request was created (so they can approve/reject if applicable)
     if (targetUser.email) {
       try {
         const roleDetail = requested_role === 'club_president' ? 'Club President' : requested_role.replace('_', ' ');
@@ -1055,8 +1086,8 @@ app.post("/api/role-requests", async (req, res) => {
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
               <h2 style="color: #6366f1;">Role Promotion Request</h2>
               <p>Hi ${targetUser.full_name},</p>
-              <p><strong>${requester.full_name}</strong> has sent you a promotion request for the role of <strong>${roleDetail}</strong>.</p>
-              <p>Please log in to your Festora account to approve or reject this request.</p>
+              <p><strong>${requester.full_name}</strong> has initiated a promotion request for the role of <strong>${roleDetail}</strong>.</p>
+              <p>Please log in to your Festora account to approve or see the status of this request.</p>
               <p>Best regards,<br>Festora Team</p>
             </div>
           `
@@ -1065,8 +1096,8 @@ app.post("/api/role-requests", async (req, res) => {
         console.error('Failed to send role request email:', emailError);
       }
     }
-    
-    res.json({ id: result.id, message: "Promotion request sent" });
+
+    res.json({ id: result.id, message: "Promotion request sent", approverIds });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
