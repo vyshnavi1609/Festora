@@ -2775,10 +2775,22 @@ const AdminDashboard = ({ user }: { user: User }) => {
             {requests.filter(r => r.status === 'pending').map(req => (
               <div key={req.id} className="bg-white p-5 rounded-3xl flex items-center justify-between border border-zinc-100 shadow-sm">
                 <div>
-                  <p className="text-sm font-black text-zinc-900">{req.target_name}</p>
-                  <p className="text-[10px] text-indigo-600 uppercase font-black tracking-widest mt-1">
-                    Request: {req.requested_role.replace('_', ' ')}
+                  <p className="text-sm font-black text-zinc-900">
+                    {req.requester_name} → {req.target_name}
                   </p>
+                  <p className="text-[10px] text-indigo-600 uppercase font-black tracking-widest mt-1">
+                    Role: {req.requested_role.replace('_', ' ')}
+                  </p>
+                  {req.club_name && (
+                    <p className="text-[9px] text-zinc-500 uppercase tracking-widest mt-1">
+                      Club: {req.club_name}
+                    </p>
+                  )}
+                  {req.created_at && (
+                    <p className="text-[8px] text-zinc-400 mt-1">
+                      {new Date(req.created_at).toLocaleString()}
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <button 
