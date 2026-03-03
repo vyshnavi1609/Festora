@@ -2095,7 +2095,7 @@ const ActivityView = ({ user, onViewProfile }: { user: User, onViewProfile: (id:
   );
 };
 
-const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewProfile, suggestions, onFollowSuggestion, refreshSuggestions }: { user: User, targetUserId?: number, onLogout: () => void, onUpdate: (u: User) => void, onBack?: () => void, onViewProfile: (id: number) => void, suggestions?: User[], onFollowSuggestion?: (id: number) => void, refreshSuggestions?: () => void }) => {
+const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewProfile, suggestions, onFollowSuggestion, refreshSuggestions, onNavigateCreate }: { user: User, targetUserId?: number, onLogout: () => void, onUpdate: (u: User) => void, onBack?: () => void, onViewProfile: (id: number) => void, suggestions?: User[], onFollowSuggestion?: (id: number) => void, refreshSuggestions?: () => void, onNavigateCreate?: () => void }) => {
   const [targetUser, setTargetUser] = useState<User | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [savedEvents, setSavedEvents] = useState<Event[]>([]);
@@ -2323,7 +2323,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
         <div className="ml-auto flex gap-6 text-zinc-950">
           {isOwnProfile && (
             <>
-              <PlusSquare size={26} strokeWidth={2.5} className="cursor-pointer hover:text-indigo-600 transition-all active:scale-90" />
+              <button onClick={onNavigateCreate} className="cursor-pointer hover:text-indigo-600 transition-all active:scale-90"><PlusSquare size={26} strokeWidth={2.5} /></button>
               <button onClick={onLogout} className="hover:text-indigo-600 transition-all active:scale-90"><Settings size={26} strokeWidth={2.5} /></button>
             </>
           )}
@@ -5075,6 +5075,7 @@ export default function App() {
                 suggestions={suggestions}
                 onFollowSuggestion={handleFollowSuggestion}
                 refreshSuggestions={fetchSuggestions}
+                onNavigateCreate={() => setActiveTab('create')}
               />
               {['admin', 'council_president', 'club_president'].includes(user.role) && !viewingProfileId && (
                 <AdminDashboard user={user} />
