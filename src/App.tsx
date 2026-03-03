@@ -2590,46 +2590,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                 >
                   {isEditing ? 'Cancel' : 'Edit Profile'}
                 </button>
-                <button 
-                  onClick={handleShare}
-                  className="flex-1 bg-zinc-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-100 transition-all border border-zinc-100 active:scale-95"
-                >
-                  Share Profile
-                </button>
               </div>
-              {/* show person suggestions when not editing */}
-              {!isEditing && suggestions && suggestions.length > 0 && (
-                <div className="mt-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-xs font-black uppercase tracking-widest text-zinc-500">Discover people</h4>
-                    <button className="text-xs font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700">See all</button>
-                  </div>
-                  <div className="space-y-3">
-                    {suggestions.map(s => (
-                      <div key={s.id} className="flex items-center justify-between p-3 bg-white border border-zinc-100 rounded-2xl">
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={s.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${s.username}`}
-                            alt={s.full_name}
-                            className="w-10 h-10 rounded-full"
-                          />
-                          <div>
-                            <p className="font-black text-sm leading-tight">{s.full_name}</p>
-                            <p className="text-[10px] text-zinc-400">@{s.username}</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => onFollowSuggestion && onFollowSuggestion(s.id)}
-                          className="w-8 h-8 bg-indigo-600 text-white rounded-full flex items-center justify-center"
-                          aria-label={`Follow ${s.full_name}`}
-                        >
-                          <UserPlus size={14} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </>
           ) : (
             <>
@@ -2647,13 +2608,6 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                   Request Membership
                 </button>
               )}
-              <button 
-                onClick={handleShare}
-                className="w-10 h-10 bg-zinc-50 rounded-full flex items-center justify-center hover:bg-zinc-100 transition-all"
-                aria-label="Share profile"
-              >
-                <Share2 size={16} />
-              </button>
             </>
           )}
         </div>
@@ -2665,13 +2619,12 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
           >
             <Calendar size={22} strokeWidth={activeTab === 'posts' ? 2.5 : 2} />
             {activeTab === 'posts' && <motion.div layoutId="profileTab" className="absolute top-0 left-0 right-0 h-0.5 bg-zinc-900" />}
-              <button 
-                onClick={handleShare}
-                className="w-10 h-10 bg-zinc-50 rounded-full flex items-center justify-center hover:bg-zinc-100 transition-all"
-                aria-label="Share profile"
-              >
-                <Share2 size={16} />
-              </button>
+          </button>
+          <button 
+            onClick={() => setActiveTab('saved')}
+            className={`flex-1 py-4 flex justify-center relative ${activeTab === 'saved' ? 'text-zinc-900' : 'text-zinc-300'}`}
+          >
+            <Bookmark size={22} strokeWidth={activeTab === 'saved' ? 2.5 : 2} />
             {activeTab === 'saved' && <motion.div layoutId="profileTab" className="absolute top-0 left-0 right-0 h-0.5 bg-zinc-900" />}
           </button>
         </div>
