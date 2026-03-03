@@ -150,27 +150,53 @@ const Navbar = ({ activeTab, setActiveTab, user }: { activeTab: string, setActiv
   ];
 
   return (
-    <nav className="hidden sm:flex fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-zinc-100/50 px-6 py-3 justify-around items-center z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
-      {tabs.map((tab) => {
-        if (tab.roles && (!user || !tab.roles.includes(user.role))) return null;
-        const Icon = tab.icon;
-        return (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`p-3 rounded-full transition-all relative group ${activeTab === tab.id ? `${tab.color} bg-zinc-50` : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'}`}
-          >
-            <Icon size={20} strokeWidth={activeTab === tab.id ? 3 : 2} className="transition-transform group-active:scale-90" />
-            {activeTab === tab.id && (
-              <motion.div 
-                layoutId="navDot"
-                className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full shadow-lg ${tab.color.replace('text-', 'bg-')} shadow-current`} 
-              />
-            )}
-          </button>
-        );
-      })}
-    </nav>
+    <>
+      {/* Desktop / large screens nav */}
+      <nav className="hidden sm:flex fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-zinc-100/50 px-6 py-3 justify-around items-center z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+        {tabs.map((tab) => {
+          if (tab.roles && (!user || !tab.roles.includes(user.role))) return null;
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`p-3 rounded-full transition-all relative group ${activeTab === tab.id ? `${tab.color} bg-zinc-50` : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'}`}
+            >
+              <Icon size={20} strokeWidth={activeTab === tab.id ? 3 : 2} className="transition-transform group-active:scale-90" />
+              {activeTab === tab.id && (
+                <motion.div 
+                  layoutId="navDot"
+                  className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full shadow-lg ${tab.color.replace('text-', 'bg-')} shadow-current`} 
+                />
+              )}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* Mobile nav (visible on small screens) */}
+      <nav className="sm:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-zinc-100 px-4 py-2 flex justify-between items-center z-50">
+        {tabs.map((tab) => {
+          if (tab.roles && (!user || !tab.roles.includes(user.role))) return null;
+          const Icon = tab.icon;
+          // make the create button prominent in center
+          if (tab.id === 'create') {
+            return (
+              <div key={tab.id} className="flex-1 flex justify-center">
+                <button onClick={() => setActiveTab(tab.id)} className="-mt-6 bg-white rounded-full p-4 shadow-xl border border-zinc-100">
+                  <Icon size={26} className="text-emerald-500" />
+                </button>
+              </div>
+            );
+          }
+          return (
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 flex flex-col items-center justify-center py-1 text-zinc-600`}>
+              <Icon size={20} strokeWidth={2} />
+            </button>
+          );
+        })}
+      </nav>
+    </>
   );
 };
 
@@ -1337,11 +1363,17 @@ const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, o
       {/* Stories Component */}
       <Stories user={user} onViewProfile={onViewProfile} onSendMessage={onSendMessage} />
       
-      <div className="space-y-6">
-        <div className="space-y-4">
-          {events.map(event => (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {events.length === 0 && (
+          <div className="col-span-1 md:col-span-2 py-20 text-center text-zinc-400">
+            <Calendar size={48} className="mx-auto mb-4 opacity-20" />
+            <p className="font-bold">No events found</p>
+          </div>
+        )}
+
+        {events.map(event => (
+          <div key={event.id} className="w-full">
             <EventCard 
-              key={event.id} 
               event={event} 
               user={user} 
               onRegister={onRegister} 
@@ -1357,14 +1389,8 @@ const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, o
               isLiked={likedEventIds.includes(event.id)}
               onLike={fetchLikes}
             />
-          ))}
-          {events.length === 0 && (
-            <div className="py-20 text-center text-zinc-400">
-              <Calendar size={48} className="mx-auto mb-4 opacity-20" />
-              <p className="font-bold">No events found</p>
-            </div>
-          )}
-        </div>
+          </div>
+        ))}
       </div>
 
       <CalendarModal 
