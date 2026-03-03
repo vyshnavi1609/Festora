@@ -63,6 +63,67 @@ export default defineConfig(({ mode }) => {
           return res.end(JSON.stringify(u));
         }
 
+        // role requests
+        if (req.method === 'GET' && req.url.startsWith('/api/role-requests')) {
+          res.setHeader('Content-Type', 'application/json');
+          // we don't filter by user; just return all for simplicity
+          return res.end(JSON.stringify(mock.roleRequests || []));
+        }
+
+        if (req.method === 'POST' && req.url === '/api/role-requests') {
+          let body = '';
+          req.on('data', chunk => body += chunk);
+          req.on('end', () => {
+            try {
+              const data = JSON.parse(body);
+              const newReq = {
+                id: (mock.roleRequests.length ? mock.roleRequests[mock.roleRequests.length-1].id+1 : 1),
+                requester_id: data.requester_id,
+                requester_name: mock.users.find(u=>u.id===data.requester_id)?.full_name || 'unknown',
+                target_user_id: data.target_user_id,
+                target_name: mock.users.find(u=>u.id===data.target_user_id)?.full_name || 'unknown',
+                requested_role: data.requested_role,
+                status: 'pending',
+                club_id: data.club_id || null,
+                club_name: data.club_name || null,
+                created_at: new Date().toISOString()
+              };
+              mock.roleRequests.push(newReq);
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify(newReq));
+            } catch (e) {
+              res.statusCode = 400;
+              res.end('invalid');
+            }
+          });
+          return;
+        }
+
+        if (req.method === 'POST' && req.url === '/api/role-requests/approve') {
+          let body = '';
+          req.on('data', c=> body+=c);
+          req.on('end', () => {
+            const { requestId } = JSON.parse(body);
+            const idx = mock.roleRequests.findIndex(r=>r.id===requestId);
+            if (idx !== -1) mock.roleRequests[idx].status = 'approved';
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: true }));
+          });
+          return;
+        }
+        if (req.method === 'POST' && req.url === '/api/role-requests/reject') {
+          let body = '';
+          req.on('data', c=> body+=c);
+          req.on('end', () => {
+            const { requestId } = JSON.parse(body);
+            const idx = mock.roleRequests.findIndex(r=>r.id===requestId);
+            if (idx !== -1) mock.roleRequests[idx].status = 'rejected';
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ success: true }));
+          });
+          return;
+        }
+
         // Fallback to proxy if not handled
         return next();
       });

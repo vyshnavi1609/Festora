@@ -54,4 +54,19 @@ export const likes = [
   { user_id: 1, event_id: 101 }
 ];
 
-export default { users, events, registrations, likes };
+export const roleRequests = [
+  {
+    id: 1,
+    requester_id: 1,
+    requester_name: 'Alice Johnson',
+    target_user_id: 2,
+    target_name: 'Bob Kumar',
+    requested_role: 'club_member',
+    status: 'pending',
+    club_id: null,
+    club_name: null,
+    created_at: new Date().toISOString()
+  }
+];
+
+export default { users, events, registrations, likes, roleRequests };

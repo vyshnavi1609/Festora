@@ -2226,6 +2226,22 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
     fetchFollowData();
   };
 
+
+  const sendRoleRequest = async (targetId: number, role: Role) => {
+    try {
+      const res = await fetch('/api/role-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requester_id: user.id, target_user_id: targetId, requested_role: role })
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      alert('Role request sent!');
+    } catch (err) {
+      console.error('failed to send role request', err);
+      alert('Unable to send request');
+    }
+  };
+
   const handleSaveProfile = async () => {
     await fetch(`/api/users/${user.id}/profile`, {
       method: 'POST',
@@ -2445,11 +2461,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
               </button>
               {targetUser?.role && ['council_president', 'club_president'].includes(targetUser.role) && (
                 <button 
-                  onClick={() => fetch('/api/role-requests', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ requester_id: user.id, target_user_id: targetUser.id, requested_role: 'club_member' })
-                  }).then(() => alert('Role request sent!'))}
+                  onClick={() => sendRoleRequest(targetUser.id, 'club_member')}
                   className="flex-1 bg-rose-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all border border-rose-100 active:scale-95"
                 >
                   Request Role
@@ -2595,45 +2607,78 @@ const AdminDashboard = ({ user }: { user: User }) => {
   const [activeTab, setActiveTab] = useState<'stats' | 'requests' | 'users' | 'permissions'>(user.role === 'admin' ? 'stats' : 'requests');
 
   const fetchData = async () => {
-    const [uRes, rRes] = await Promise.all([
-      fetch(`/api/users?requester=${user.id}`),
-      fetch(`/api/role-requests/${user.id}`)
-    ]);
-    setUsers(await uRes.json());
-    setRequests(await rRes.json());
-    
-    if (user.role === 'admin') {
-      const gRes = await fetch('/api/analytics/global');
-      setGlobalStats(await gRes.json());
+    try {
+      const [uRes, rRes] = await Promise.all([
+        fetch(`/api/users?requester=${user.id}`),
+        fetch(`/api/role-requests/${user.id}`)
+      ]);
+      if (uRes.ok) {
+        setUsers(await uRes.json());
+      } else {
+        console.warn('failed to load users', uRes.status);
+      }
+      if (rRes.ok) {
+        setRequests(await rRes.json());
+      } else {
+        console.warn('failed to load role requests', rRes.status);
+        setRequests([]);
+      }
+      
+      if (user.role === 'admin') {
+        const gRes = await fetch('/api/analytics/global');
+        if (gRes.ok) setGlobalStats(await gRes.json());
+      }
+    } catch (err) {
+      console.error('error fetching admin data', err);
+      setUsers([]);
+      setRequests([]);
     }
   };
 
   useEffect(() => { fetchData(); }, []);
 
   const handleRequestRole = async (targetId: number, role: Role) => {
-    await fetch('/api/role-requests', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requester_id: user.id, target_user_id: targetId, requested_role: role })
-    });
+    try {
+      const res = await fetch('/api/role-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requester_id: user.id, target_user_id: targetId, requested_role: role })
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+    } catch (err) {
+      console.error('error sending role request', err);
+      alert('Unable to send role request');
+    }
     fetchData();
   };
 
   const handleApprove = async (requestId: number) => {
-    await fetch('/api/role-requests/approve', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestId })
-    });
+    try {
+      const res = await fetch('/api/role-requests/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId })
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+    } catch (err) {
+      console.error('approve failed', err);
+      alert('Failed to approve request');
+    }
     fetchData();
   };
 
   const handleReject = async (requestId: number) => {
-    await fetch('/api/role-requests/reject', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requestId })
-    });
+    try {
+      const res = await fetch('/api/role-requests/reject', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId })
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+    } catch (err) {
+      console.error('reject failed', err);
+      alert('Failed to reject request');
+    }
     fetchData();
   };
 
