@@ -3301,6 +3301,7 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [collegeSearch, setCollegeSearch] = useState('');
   const [showCollegeDropdown, setShowCollegeDropdown] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   // Sync college search with selected college
   useEffect(() => {
@@ -3337,11 +3338,15 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
     if (e) e.preventDefault();
     
     try {
+      setIsLoading(true);
+      setError('');
+      
       // Validate all required fields for signup
       if (!isLogin) {
         if (!formData.username || !formData.email || !formData.phone_number || !formData.password || !formData.full_name || !formData.college_name || !formData.roll_no) {
           setError('Please fill all required fields');
           console.error('Missing fields:', { formData, customCollegeName });
+          setIsLoading(false);
           return;
         }
       }
@@ -3373,14 +3378,17 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
       
       if (res.ok) {
         console.log('Login/Register successful, user:', data);
+        setIsLoading(false);
         onLogin(data);
       } else {
         console.error('Login/Register failed:', data.error);
         setError(data.error || 'An error occurred. Please try again.');
+        setIsLoading(false);
       }
     } catch (err) {
       console.error('handleSubmit error:', err);
       setError('An error occurred. Please check your connection and try again.');
+      setIsLoading(false);
     }
   };
 
@@ -3491,7 +3499,9 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
                 </button>
               </div>
               {error && <p className="text-red-500 text-[10px] text-center font-black uppercase tracking-widest">{error}</p>}
-              <Button type="submit" variant="primary" className="w-full py-5 text-xs">Log In</Button>
+              <Button type="submit" disabled={isLoading} variant="primary" className="w-full py-5 text-xs disabled:opacity-50">
+                {isLoading ? 'Logging In...' : 'Log In'}
+              </Button>
               <div className="flex justify-center pt-4">
                 <button 
                   type="button" 
@@ -3689,8 +3699,10 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
                   {error && <p className="text-red-500 text-[10px] text-center font-black uppercase tracking-widest">{error}</p>}
                   
                   <div className="flex gap-3">
-                    <button onClick={prevStep} className="flex-1 bg-zinc-100 text-zinc-600 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest">Back</button>
-                    <Button onClick={() => handleSubmit()} variant="primary" className="flex-[2] py-5 text-xs">Complete Sign Up</Button>
+                    <button onClick={prevStep} disabled={isLoading} className="flex-1 bg-zinc-100 text-zinc-600 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest disabled:opacity-50">Back</button>
+                    <Button onClick={() => handleSubmit()} disabled={isLoading} variant="primary" className="flex-[2] py-5 text-xs disabled:opacity-50">
+                      {isLoading ? 'Creating Account...' : 'Complete Sign Up'}
+                    </Button>
                   </div>
                 </div>
               )}
