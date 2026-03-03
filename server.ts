@@ -428,12 +428,21 @@ emailTransporter.verify().then(() => {
 // Auth Routes (Simplified for demo)
 app.post("/api/login", async (req, res) => {
   const { identifier, password } = req.body;
-  // identifier can be username, email, or phone_number
+  
+  // Trim whitespace from inputs
+  const trimmedIdentifier = (identifier || '').trim();
+  const trimmedPassword = password || '';
+  
+  if (!trimmedIdentifier || !trimmedPassword) {
+    return res.status(400).json({ error: "Username/Email/Phone and password are required" });
+  }
+  
+  // identifier can be username, email, or phone_number - case-insensitive for email and username
   const user = await queryOne(`
     SELECT * FROM users 
-    WHERE (username = $1 OR email = $1 OR phone_number = $1) 
+    WHERE (LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($1) OR phone_number = $1) 
     AND password = $2
-  `, [identifier, password]);
+  `, [trimmedIdentifier, trimmedPassword]);
   
   if (user) {
     res.json(user);
@@ -445,8 +454,21 @@ app.post("/api/login", async (req, res) => {
 app.post("/api/register", async (req, res) => {
   const { username, email, phone_number, password, full_name, avatar_url, college_name, roll_no } = req.body;
 
+  // Validate inputs
+  if (!username || !email || !phone_number || !password || !full_name || !college_name || !roll_no) {
+    return res.status(400).json({ error: "All fields are required" });
+  }
+
+  // Trim inputs
+  const trimmedUsername = username.trim();
+  const trimmedEmail = email.trim();
+  const trimmedPhone = phone_number.trim();
+  const trimmedCollege = college_name.trim();
+  const trimmedRollNo = roll_no.trim();
+  const trimmedFullName = full_name.trim();
+
   // Check if roll number already exists for this college
-  const existingRollNo = await queryOne("SELECT id FROM users WHERE college_name = $1 AND roll_no = $2", [college_name, roll_no]);
+  const existingRollNo = await queryOne("SELECT id FROM users WHERE LOWER(college_name) = LOWER($1) AND LOWER(roll_no) = LOWER($2)", [trimmedCollege, trimmedRollNo]);
   if (existingRollNo) {
     return res.status(400).json({ error: "A student with this roll number already exists in your college" });
   }
@@ -454,26 +476,26 @@ app.post("/api/register", async (req, res) => {
   try {
     const result = await queryOne(
       "INSERT INTO users (username, email, phone_number, password, full_name, avatar_url, college_name, roll_no, role) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id",
-      [username, email, phone_number, password, full_name, avatar_url, college_name, roll_no, 'student']
+      [trimmedUsername, trimmedEmail, trimmedPhone, password, trimmedFullName, avatar_url, trimmedCollege, trimmedRollNo, 'student']
     );
     const user = await queryOne("SELECT * FROM users WHERE id = $1", [result.id]);
 
     // Send welcome email
     const welcomeMailOptions = {
       from: `Festora <${process.env.EMAIL_FROM}>`,
-      to: email,
+      to: trimmedEmail,
       subject: 'Welcome to Festora - Registration Successful!',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #6366f1;">Welcome to Festora, ${full_name}!</h2>
+          <h2 style="color: #6366f1;">Welcome to Festora, ${trimmedFullName}!</h2>
           <p>Congratulations! Your account has been successfully created.</p>
 
           <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h3 style="margin-top: 0; color: #333;">Your Account Details:</h3>
-            <p><strong>Username:</strong> ${username}</p>
-            <p><strong>Email:</strong> ${email}</p>
-            <p><strong>College:</strong> ${college_name}</p>
-            <p><strong>Roll Number:</strong> ${roll_no}</p>
+            <p><strong>Username:</strong> ${trimmedUsername}</p>
+            <p><strong>Email:</strong> ${trimmedEmail}</p>
+            <p><strong>College:</strong> ${trimmedCollege}</p>
+            <p><strong>Roll Number:</strong> ${trimmedRollNo}</p>
           </div>
 
           <p>You can now:</p>

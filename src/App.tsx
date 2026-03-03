@@ -3353,16 +3353,19 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
 
       const endpoint = isLogin ? '/api/login' : '/api/register';
       const payload = isLogin
-        ? { identifier: formData.identifier, password: formData.password }
+        ? { 
+            identifier: (formData.identifier || '').trim(), 
+            password: formData.password || ''
+          }
         : {
-            username: formData.username,
-            email: formData.email,
-            phone_number: formData.phone_number,
+            username: formData.username.trim(),
+            email: formData.email.trim(),
+            phone_number: formData.phone_number.trim(),
             password: formData.password,
-            full_name: formData.full_name,
+            full_name: formData.full_name.trim(),
             avatar_url: formData.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${formData.username}`,
             college_name: formData.college_name === 'Others' ? customCollegeName : formData.college_name,
-            roll_no: formData.roll_no
+            roll_no: formData.roll_no.trim()
           };
 
       console.log('Submitting form to', endpoint, 'with payload:', isLogin ? { identifier: payload.identifier, password: '***' } : { ...payload, password: '***' });
