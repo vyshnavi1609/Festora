@@ -32,6 +32,8 @@ export interface Event {
   privacy?: string;
   college_code?: string;
   pass?: string;
+  // optional link for external registration form
+  google_form_url?: string;
 }
 
 export interface Comment {

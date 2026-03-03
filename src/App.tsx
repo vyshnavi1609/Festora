@@ -1228,7 +1228,7 @@ const Stories = ({ user, onViewProfile, onSendMessage }: { user: User, onViewPro
 };
 
 // Discover / Trending view
-const DiscoverView = ({ events, suggestions, user, onViewDetails, onFollowSuggestion }: { events: Event[], suggestions: User[], user: User, onViewDetails: (e: Event) => void, onFollowSuggestion: (id: number) => void }) => {
+const DiscoverView = ({ events, user, onViewDetails }: { events: Event[], user: User, onViewDetails: (e: Event) => void }) => {
   const trending = [...events].sort((a,b) => (b.registration_count || 0) - (a.registration_count || 0)).slice(0, 12);
   return (
     <Container className="py-24">
@@ -1254,25 +1254,6 @@ const DiscoverView = ({ events, suggestions, user, onViewDetails, onFollowSugges
           </div>
         </div>
 
-        {suggestions && suggestions.length > 0 && (
-          <div className="bg-white rounded-[28px] p-4 border border-zinc-100">
-            <h4 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-3">Suggested people</h4>
-            <div className="space-y-2">
-              {suggestions.slice(0,5).map(s => (
-                <div key={s.id} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3" onClick={() => { /* noop */ }}>
-                    <img src={s.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${s.username}`} className="w-10 h-10 rounded-full" />
-                    <div>
-                      <p className="text-sm font-black">{s.full_name}</p>
-                      <p className="text-[10px] text-zinc-400">@{s.username}</p>
-                    </div>
-                  </div>
-                  <Button onClick={() => onFollowSuggestion(s.id)} variant="primary" className="px-3 py-1.5 text-[10px]">Follow</Button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </Container>
   );
@@ -1391,7 +1372,7 @@ const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, o
   );
 };
 
-const SearchView = ({ events, user, suggestions, onRegister, onUnregister, onSave, onMessage, onEdit, onRefresh, onViewProfile, onViewDetails, onFollowSuggestion, onBack }: { events: Event[], user: User, suggestions: User[], onRegister: (id: number) => void, onUnregister: (id: number) => void, onSave: (id: number) => void, onMessage: (id: number) => void, onEdit: (event: Event) => void, onRefresh: () => void, onViewProfile: (userId: number) => void, onViewDetails: (event: Event) => void, onFollowSuggestion: (id: number) => void, onBack?: () => void }) => {
+const SearchView = ({ events, user, onRegister, onUnregister, onSave, onMessage, onEdit, onRefresh, onViewProfile, onViewDetails, onBack }: { events: Event[], user: User, onRegister: (id: number) => void, onUnregister: (id: number) => void, onSave: (id: number) => void, onMessage: (id: number) => void, onEdit: (event: Event) => void, onRefresh: () => void, onViewProfile: (userId: number) => void, onViewDetails: (event: Event) => void, onBack?: () => void }) => {
   const [search, setSearch] = useState('');
   const [registeredEventIds, setRegisteredEventIds] = useState<number[]>([]);
 
@@ -1406,7 +1387,10 @@ const SearchView = ({ events, user, suggestions, onRegister, onUnregister, onSav
   const categories = ['Workshop', 'Social', 'Academic', 'Concert'];
 
   const filteredEvents = events.filter(e => {
-    const matchesSearch = e.title.toLowerCase().includes(search.toLowerCase()) || e.description.toLowerCase().includes(search.toLowerCase());
+    const lower = search.toLowerCase();
+    const matchesSearch = e.title.toLowerCase().includes(lower) \
+      || e.description.toLowerCase().includes(lower) \
+      || (e.organizer_name && e.organizer_name.toLowerCase().includes(lower));
     const matchesLocation = !filterLocation || e.location.toLowerCase().includes(filterLocation.toLowerCase());
     const matchesDate = !filterDate || e.date === filterDate;
     const matchesCategory = !filterCategory || e.category === filterCategory;
@@ -1521,40 +1505,6 @@ const SearchView = ({ events, user, suggestions, onRegister, onUnregister, onSav
         )}
       </AnimatePresence>
 
-      {/* Who to Follow Section */}
-      {suggestions.length > 0 && (
-        <div className="max-w-md mx-auto mb-8">
-          <div className="bg-white rounded-[40px] p-6 border border-zinc-100 card-shadow overflow-hidden">
-            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-600 mb-4">Suggested For You</h3>
-            <div className="space-y-3">
-              {suggestions.slice(0, 5).map(sug => (
-                <div key={sug.id} className="flex items-center justify-between p-3 bg-zinc-50 rounded-2xl hover:bg-white transition-all border border-zinc-100 interactive">
-                  <div 
-                    className="flex items-center gap-3 cursor-pointer flex-1"
-                    onClick={() => onViewProfile(sug.id)}
-                  >
-                    <img 
-                      src={sug.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${sug.username}`}
-                      alt="avatar"
-                      className="w-10 h-10 rounded-full"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-black text-zinc-950 truncate">{sug.full_name}</p>
-                      <p className="text-[9px] text-zinc-500">@{sug.username}</p>
-                    </div>
-                  </div>
-                  <button 
-                    onClick={() => onFollowSuggestion(sug.id)}
-                    className="px-4 py-1.5 bg-indigo-600 text-white text-[9px] font-black rounded-xl hover:bg-indigo-700 transition-colors ml-2"
-                  >
-                    Follow
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
       
       <div className="max-w-md mx-auto grid grid-cols-3 gap-1.5 mt-6">
         {filteredEvents.map(event => (          <div 
@@ -1628,7 +1578,8 @@ const CreateEventView = ({ user, onCreated, editingEvent, onCancel }: { user: Us
     qr_code: editingEvent?.qr_code || '',
     privacy: editingEvent?.privacy || 'social',
     college_code: editingEvent?.college_code || '',
-    pass: editingEvent?.pass || ''
+    pass: editingEvent?.pass || '',
+    google_form_url: editingEvent?.google_form_url || ''
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isUploading, setIsUploading] = useState(false);
@@ -1640,6 +1591,10 @@ const CreateEventView = ({ user, onCreated, editingEvent, onCancel }: { user: Us
     if (!formData.description.trim()) newErrors.description = 'Description is required';
     if (!formData.date) newErrors.date = 'Date is required';
     if (!formData.location.trim()) newErrors.location = 'Location is required';
+
+    if (formData.google_form_url && !formData.google_form_url.startsWith('http')) {
+      newErrors.google_form_url = 'Must be a valid URL';
+    }
     
     const selectedDate = new Date(formData.date);
     if (isNaN(selectedDate.getTime())) newErrors.date = 'Invalid date format';
@@ -1702,7 +1657,12 @@ const CreateEventView = ({ user, onCreated, editingEvent, onCancel }: { user: Us
       body: JSON.stringify({ ...formData, created_by: user.id })
     });
     
-    if (res.ok) onCreated();
+    if (res.ok) {
+      onCreated();
+    } else {
+      const err = await res.json().catch(() => null);
+      alert((err && err.error) || 'Failed to post event');
+    }
   };
 
   return (
@@ -1891,6 +1851,17 @@ const CreateEventView = ({ user, onCreated, editingEvent, onCancel }: { user: Us
               value={formData.pass}
               onChange={e => setFormData({...formData, pass: e.target.value})}
             />
+          </div>
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">Google Form / Registration Link (Optional)</label>
+            <input
+              type="text"
+              placeholder="https://forms.gle/..."
+              className={`input-field mt-1.5 ${errors.google_form_url ? 'border-red-500' : ''}`}
+              value={formData.google_form_url}
+              onChange={e => setFormData({...formData, google_form_url: e.target.value})}
+            />
+            {errors.google_form_url && <p className="text-[10px] text-red-500 font-bold mt-1.5 ml-2">{errors.google_form_url}</p>}
           </div>
         </div>
 
@@ -2124,6 +2095,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
   const [showFollowing, setShowFollowing] = useState(false);
   const [followersList, setFollowersList] = useState<User[]>([]);
   const [followingList, setFollowingList] = useState<User[]>([]);
+  const [profileClubs, setProfileClubs] = useState<any[]>([]);
   const [userEventsCount, setUserEventsCount] = useState(0);
   const [editData, setEditData] = useState({
     bio: '',
@@ -2157,6 +2129,9 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
         college_name: data.college_name || '',
         roll_no: data.roll_no || ''
       });
+      // fetch followers/following so we can show a small preview on the profile
+      fetchFollowersList();
+      fetchFollowingList();
       // if the profile belongs to someone else, fetch any clubs they are part of (useful for role requests)
       if (!isOwnProfile) {
         const clubRes = await fetch(`/api/users/${effectiveUserId}/clubs`);
@@ -2354,6 +2329,58 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
             </div>
           </div>
         </div>
+        {(followersList.length > 0 || followingList.length > 0) && (
+          <div className="mb-8 space-y-4">
+            {followersList.length > 0 && (
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Followers</h4>
+                <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                  {followersList.slice(0,10).map(u => (
+                    <img
+                      key={u.id}
+                      src={u.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.username}`}
+                      alt={u.full_name}
+                      className="w-10 h-10 rounded-full"
+                      onClick={() => { onViewProfile(u.id); }}
+                    />
+                  ))}
+                  {followersList.length > 10 && (
+                    <button
+                      onClick={() => { fetchFollowersList(); setShowFollowers(true); }}
+                      className="text-[10px] font-bold ml-2"
+                    >
+                      View more
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+            {followingList.length > 0 && (
+              <div>
+                <h4 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-2">Following</h4>
+                <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                  {followingList.slice(0,10).map(u => (
+                    <img
+                      key={u.id}
+                      src={u.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${u.username}`}
+                      alt={u.full_name}
+                      className="w-10 h-10 rounded-full"
+                      onClick={() => { onViewProfile(u.id); }}
+                    />
+                  ))}
+                  {followingList.length > 10 && (
+                    <button
+                      onClick={() => { fetchFollowingList(); setShowFollowing(true); }}
+                      className="text-[10px] font-bold ml-2"
+                    >
+                      View more
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
@@ -3102,12 +3129,13 @@ const ResetPasswordView = ({ token, onComplete }: { token: string, onComplete: (
   useEffect(() => {
     // show hint of which account the token belongs to
     fetch(`/api/reset-password/verify?token=${encodeURIComponent(token)}`)
-      .then(res => res.json())
-      .then(data => {
+      .then(async res => {
+        const data = await res.json();
         if (res.ok) {
           setAccountHint(data.user);
         }
-      }).catch(() => {});
+      })
+      .catch(() => {});
   }, [token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -4192,6 +4220,7 @@ export default function App() {
   const [suggestions, setSuggestions] = useState<User[]>([]);
   const [activity, setActivity] = useState<any[]>([]);
   const [showPeople, setShowPeople] = useState(false);
+  const [profileClubs, setProfileClubs] = useState<any[]>([]); // clubs belonging to the profile being viewed
   const [previousTab, setPreviousTab] = useState<string>('home');
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
@@ -4298,6 +4327,10 @@ export default function App() {
       const data = await res.json();
       setRegisteringEvent(null);
       showToast(data.message || 'Registration successful!');
+      if (data.registration_url) {
+        // open the external form in a new tab
+        window.open(data.registration_url, '_blank');
+      }
       fetchEvents();
       fetchRegistrations();
     } else {
@@ -4411,13 +4444,12 @@ export default function App() {
             />
           )}
           {activeTab === 'discover' && (
-            <DiscoverView events={events} suggestions={suggestions} user={user} onViewDetails={setViewingEvent} onFollowSuggestion={handleFollowSuggestion} />
+            <DiscoverView events={events} user={user} onViewDetails={setViewingEvent} />
           )}
           {activeTab === 'promotions' && (
             <SearchView 
               events={events} 
               user={user} 
-              suggestions={suggestions}
               onRegister={handleRegister} 
               onUnregister={handleUnregister}
               onSave={handleSave} 
@@ -4426,7 +4458,6 @@ export default function App() {
               onRefresh={fetchEvents} 
               onViewProfile={handleViewProfile}
               onViewDetails={setViewingEvent}
-              onFollowSuggestion={handleFollowSuggestion}
               onBack={() => setActiveTab(previousTab)}
             />
           )}
