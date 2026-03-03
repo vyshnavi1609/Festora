@@ -529,10 +529,12 @@ app.post("/api/forgot-password", async (req, res) => {
     
     await emailTransporter.sendMail(mailOptions);
     console.log('Email sent successfully to:', email);
-    res.json({ message: "Password reset email sent successfully" });
+    // return resetUrl as well for debugging/dev purposes
+    res.json({ message: "Password reset email sent successfully", resetUrl });
   } catch (error) {
     console.error('Email sending failed:', error);
-    res.status(500).json({ error: "Failed to send reset email" });
+    // still return resetUrl so developer can use it manually
+    res.status(500).json({ error: "Failed to send reset email", resetUrl });
   }
 });
 

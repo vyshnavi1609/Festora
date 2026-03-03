@@ -3220,9 +3220,17 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
     
     const data = await res.json();
     if (res.ok) {
-      setForgotPasswordMessage('Password reset email sent! Check your inbox.');
+      let msg = 'Password reset email sent! Check your inbox.';
+      if (data.resetUrl) {
+        msg += ` (Link: ${data.resetUrl})`;
+      }
+      setForgotPasswordMessage(msg);
     } else {
-      setForgotPasswordMessage(data.error);
+      let msg = data.error;
+      if (data.resetUrl) {
+        msg += ` (Link: ${data.resetUrl})`;
+      }
+      setForgotPasswordMessage(msg);
     }
   };
 
