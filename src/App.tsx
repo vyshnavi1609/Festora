@@ -156,11 +156,13 @@ const Navbar = ({ activeTab, setActiveTab, user }: { activeTab: string, setActiv
         {tabs.map((tab) => {
           if (tab.roles && (!user || !tab.roles.includes(user.role))) return null;
           const Icon = tab.icon;
+          // make create tab same style as others instead of extra emphasis
+          const baseClass = activeTab === tab.id ? `${tab.color} bg-zinc-50` : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50';
           return (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`p-3 rounded-full transition-all relative group ${activeTab === tab.id ? `${tab.color} bg-zinc-50` : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'}`}
+              className={`p-3 rounded-full transition-all relative group ${baseClass}`}
             >
               <Icon size={20} strokeWidth={activeTab === tab.id ? 3 : 2} className="transition-transform group-active:scale-90" />
               {activeTab === tab.id && (
@@ -179,18 +181,9 @@ const Navbar = ({ activeTab, setActiveTab, user }: { activeTab: string, setActiv
         {tabs.map((tab) => {
           if (tab.roles && (!user || !tab.roles.includes(user.role))) return null;
           const Icon = tab.icon;
-          // make the create button prominent in center
-          if (tab.id === 'create') {
-            return (
-              <div key={tab.id} className="flex-1 flex justify-center">
-                <button onClick={() => setActiveTab(tab.id)} className="-mt-6 bg-white rounded-full p-4 shadow-xl border border-zinc-100">
-                  <Icon size={26} className="text-emerald-500" />
-                </button>
-              </div>
-            );
-          }
+          // treat all tabs uniformly; no special elevation for create
           return (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 flex flex-col items-center justify-center py-1 text-zinc-600`}>
+            <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 flex flex-col items-center justify-center py-1 text-zinc-600` }>
               <Icon size={20} strokeWidth={2} />
             </button>
           );
