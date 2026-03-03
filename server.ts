@@ -111,7 +111,21 @@ async function initializeDatabase() {
     `);
     // some deployments might have created the table before club_id was added
     await execute(`ALTER TABLE role_requests ADD COLUMN IF NOT EXISTS club_id INTEGER`);
-    // we don't attempt to re-add the FK constraint; it's non‑critical and may already exist
+    // ensure the foreign key exists as well; on older schemas it may be missing
+    await execute(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE table_name='role_requests' AND constraint_type='FOREIGN KEY' AND constraint_name='role_requests_club_id_fkey'
+        ) THEN
+          ALTER TABLE role_requests
+            ADD CONSTRAINT role_requests_club_id_fkey
+            FOREIGN KEY (club_id) REFERENCES clubs(id);
+        END IF;
+      END
+      $$;
+    `);
 
     await execute(`
       CREATE TABLE IF NOT EXISTS messages (
