@@ -1465,7 +1465,7 @@ const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, o
   );
 };
 
-const SearchView = ({ events, user, onRegister, onUnregister, onSave, onMessage, onEdit, onRefresh, onViewProfile, onViewDetails, onBack }: { events: Event[], user: User, onRegister: (id: number) => void, onUnregister: (id: number) => void, onSave: (id: number) => void, onMessage: (id: number) => void, onEdit: (event: Event) => void, onRefresh: () => void, onViewProfile: (userId: number) => void, onViewDetails: (event: Event) => void, onBack?: () => void }) => {
+const SearchView = ({ events, user, onRegister, onUnregister, onSave, onMessage, onEdit, onRefresh, onViewProfile, onViewDetails, onBack, suggestions, onFollowSuggestion }: { events: Event[], user: User, onRegister: (id: number) => void, onUnregister: (id: number) => void, onSave: (id: number) => void, onMessage: (id: number) => void, onEdit: (event: Event) => void, onRefresh: () => void, onViewProfile: (userId: number) => void, onViewDetails: (event: Event) => void, onBack?: () => void, suggestions?: User[], onFollowSuggestion?: (id: number) => void }) => {
   const [search, setSearch] = useState('');
   const [registeredEventIds, setRegisteredEventIds] = useState<number[]>([]);
 
@@ -1600,6 +1600,34 @@ const SearchView = ({ events, user, onRegister, onUnregister, onSave, onMessage,
         )}
       </AnimatePresence>
 
+      {/* Discover People Section */}
+      {suggestions && suggestions.length > 0 && (
+        <div className="max-w-md mx-auto mb-6">
+          <h3 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-3">Discover people</h3>
+          <div className="flex gap-3">
+            {suggestions.slice(0, 4).map(s => (
+              <div key={s.id} className="flex-shrink-0 w-20 text-center">
+                <button onClick={() => onViewProfile(s.id)} className="flex flex-col items-center gap-2">
+                  <div className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center border-2 border-white shadow-sm" style={{background: s.avatar_url ? 'transparent' : 'linear-gradient(135deg,#e9d5ff,#c7d2fe)'}}>
+                    {s.avatar_url ? (
+                      <img src={s.avatar_url} alt={s.full_name} className="w-full h-full object-cover" />
+                    ) : (
+                      <img src={`https://api.dicebear.com/7.x/identicon/svg?seed=${s.username}`} alt={s.full_name} className="w-full h-full object-cover" />
+                    )}
+                  </div>
+                  <p className="font-black text-[11px] leading-tight text-zinc-900 truncate w-full">{s.full_name.split(' ')[0]}</p>
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onFollowSuggestion && onFollowSuggestion(s.id); }}
+                  className="mt-2 mx-auto w-8 h-8 text-white rounded-full bg-indigo-600 flex items-center justify-center hover:bg-indigo-700 transition-colors"
+                >
+                  <UserPlus size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       
       <div className="max-w-md mx-auto grid grid-cols-3 gap-1.5 mt-6">
         {filteredEvents.map(event => (          <div 
@@ -5109,6 +5137,8 @@ export default function App() {
               onViewProfile={handleViewProfile}
               onViewDetails={setViewingEvent}
               onBack={() => setActiveTab(previousTab)}
+              suggestions={suggestions}
+              onFollowSuggestion={handleFollowSuggestion}
             />
           )}
           {activeTab === 'create' && (
