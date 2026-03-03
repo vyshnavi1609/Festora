@@ -397,6 +397,13 @@ const emailTransporter = nodemailer.createTransport({
   },
 });
 
+// verify transporter on startup to catch configuration issues
+emailTransporter.verify().then(() => {
+  console.log('Email transporter verified');
+}).catch(err => {
+  console.warn('Email transporter verification failed:', err.message);
+});
+
 
 // Auth Routes (Simplified for demo)
 app.post("/api/login", async (req, res) => {
@@ -531,10 +538,11 @@ app.post("/api/forgot-password", async (req, res) => {
     console.log('Email sent successfully to:', email);
     // return resetUrl as well for debugging/dev purposes
     res.json({ message: "Password reset email sent successfully", resetUrl });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Email sending failed:', error);
     // still return resetUrl so developer can use it manually
-    res.status(500).json({ error: "Failed to send reset email", resetUrl });
+    const msg = error?.message || 'Failed to send reset email';
+    res.status(500).json({ error: msg, resetUrl });
   }
 });
 
