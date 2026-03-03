@@ -330,11 +330,6 @@ const app = express();
 app.use(express.json());
 
 // temporary debug endpoint to verify database connectivity
-// Health check
-app.get("/health", (req, res) => {
-  res.json({ status: "Server is running", timestamp: new Date().toISOString() });
-});
-
 app.get("/debug/users", async (req, res) => {
   try {
     const users = await query("SELECT * FROM users", []);
@@ -342,17 +337,6 @@ app.get("/debug/users", async (req, res) => {
   } catch (err) {
     console.error("Debug route error:", err);
     res.status(500).json({ error: "Failed to fetch users" });
-  }
-});
-
-// Delete all non-admin users (for testing)
-app.delete("/debug/clear-users", async (req, res) => {
-  try {
-    const result = await execute("DELETE FROM users WHERE role != 'admin'", []);
-    res.json({ message: `Deleted ${result} non-admin users. Admin preserved.` });
-  } catch (err) {
-    console.error("Clear users error:", err);
-    res.status(500).json({ error: "Failed to clear users" });
   }
 });
 
@@ -1593,12 +1577,8 @@ if (process.env.NODE_ENV === "production") {
 
   app.use(express.static(distPath));
 
-  // SPA fallback - only for non-API routes
+  // SPA fallback (MUST be AFTER /__debug)
   app.get("*", (req, res) => {
-    // Don't serve index.html for API routes
-    if (req.path.startsWith("/api") || req.path.startsWith("/debug") || req.path.startsWith("/health")) {
-      return res.status(404).json({ error: "Not found" });
-    }
     res.sendFile(path.join(distPath, "index.html"));
   });
 }
