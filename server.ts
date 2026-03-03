@@ -754,7 +754,7 @@ app.post("/api/clubs/:id/members", async (req, res) => {
   }
   
   try {
-    await execute("INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3)", [
+    await execute("INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (club_id, user_id) DO UPDATE SET role = $3", [
       clubId, member_id, role || 'member'
     ]);
     res.json({ message: "Member added successfully" });
@@ -763,9 +763,59 @@ app.post("/api/clubs/:id/members", async (req, res) => {
   }
 });
 
+// Update member role
+app.put("/api/clubs/:id/members/:memberId", async (req, res) => {
+  const { user_id, role } = req.body;
+  const clubId = req.params.id;
+  const memberId = req.params.memberId;
+  
+  // Check if requester is club president
+  const club = await queryOne("SELECT president_id FROM clubs WHERE id = $1", [clubId]);
+  if (!club || club.president_id !== user_id) {
+    return res.status(403).json({ error: "Only club president can update members" });
+  }
+  
+  try {
+    await execute("UPDATE club_members SET role = $1 WHERE club_id = $2 AND user_id = $3", [
+      role, clubId, memberId
+    ]);
+    res.json({ message: "Member role updated" });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Remove member
+app.delete("/api/clubs/:id/members/:memberId", async (req, res) => {
+  const clubId = req.params.id;
+  const memberId = req.params.memberId;
+  const { user_id } = req.query;
+  
+  // Check if requester is club president
+  const club = await queryOne("SELECT president_id FROM clubs WHERE id = $1", [clubId]);
+  if (!club || club.president_id !== Number(user_id)) {
+    return res.status(403).json({ error: "Only club president can remove members" });
+  }
+  
+  try {
+    await execute("DELETE FROM club_members WHERE club_id = $1 AND user_id = $2", [
+      clubId, memberId
+    ]);
+    res.json({ message: "Member removed" });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 app.get("/api/clubs/:id/members", async (req, res) => {
   const members = await query("SELECT u.id, u.username, u.full_name, u.avatar_url, cm.role FROM club_members cm JOIN users u ON cm.user_id = u.id WHERE cm.club_id = $1", [req.params.id]);
   res.json(members);
+});
+
+// Get club follow count
+app.get("/api/clubs/:id/followers-count", async (req, res) => {
+  const result = await queryOne("SELECT COUNT(*) as count FROM club_follows WHERE club_id = $1", [req.params.id]);
+  res.json({ count: parseInt(result.count) });
 });
 
 app.get("/api/users/:id/clubs", async (req, res) => {

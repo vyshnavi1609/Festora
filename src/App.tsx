@@ -3787,7 +3787,7 @@ const SettingsView = ({ user, onLogout, onBack, setActiveTab, onOpenClubRequest 
     { icon: QrCode, label: 'Story, live and location', key: 'story_settings', color: 'text-rose-500', desc: 'Who can see your story' },
     { icon: MessageCircle, label: 'Messages and story replies', key: 'reply_settings', color: 'text-violet-600', desc: 'Control replies and DMs' },
     { icon: Globe, label: 'Follow and invite friends', key: 'follow_invite', color: 'text-amber-700', desc: 'Invite people to Festora' },
-    ...(user.role === 'club_president' ? [{ icon: Plus, label: 'Request Club', key: 'request_club', color: 'text-indigo-700', desc: 'Create a new college club' }] : []),
+    ...(user.role === 'club_president' ? [{ icon: Plus, label: 'Request Club', key: 'request_club', color: 'text-indigo-700', desc: 'Create a new college club' }, { icon: Users, label: 'Manage Club', key: 'manage_club', color: 'text-blue-700', desc: 'Manage your club members' }] : []),
     ...(user.role === 'council_president' ? [{ icon: CheckCircle2, label: 'Club Requests', key: 'club_requests', color: 'text-emerald-700', desc: 'Review club requests' }] : [])
   ];
 
@@ -3799,6 +3799,7 @@ const SettingsView = ({ user, onLogout, onBack, setActiveTab, onOpenClubRequest 
     if (key === 'privacy') return setModal('privacy');
     if (key === 'language') return setModal('language');
     if (key === 'request_club') return onOpenClubRequest?.();
+    if (key === 'manage_club') return setActiveTab?.('club-management');
     if (key === 'club_requests') return setActiveTab?.('club-requests');
     if (key === 'close_friends') {
       // fetch suggestions to populate close friends list
@@ -4530,6 +4531,192 @@ const ClubRequestsView = ({ user, onBack }: { user: User, onBack?: () => void })
   );
 };
 
+// Club Management View (for Club Presidents)
+const ClubManagementView = ({ user, onBack }: { user: User, onBack?: () => void }) => {
+  const [userClubs, setUserClubs] = useState<any[]>([]);
+  const [selectedClub, setSelectedClub] = useState<any | null>(null);
+  const [members, setMembers] = useState<any[]>([]);
+  const [addMemberEmail, setAddMemberEmail] = useState('');
+  const [memberRole, setMemberRole] = useState('member');
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetchClubs = () => {
+    fetch(`/api/users/${user.id}/clubs`)
+      .then(res => res.json())
+      .then(setUserClubs);
+  };
+
+  useEffect(() => {
+    fetchClubs();
+  }, [user.id]);
+
+  const fetchMembers = (clubId: number) => {
+    fetch(`/api/clubs/${clubId}/members`)
+      .then(res => res.json())
+      .then(setMembers);
+  };
+
+  const handleSelectClub = (club: any) => {
+    setSelectedClub(club);
+    fetchMembers(club.id);
+  };
+
+  const handleAddMember = async () => {
+    if (!addMemberEmail) {
+      alert('Please enter email or ID');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      // First find user by email
+      const userRes = await fetch(`/api/users?email=${addMemberEmail}`);
+      if (!userRes.ok) {
+        alert('User not found');
+        setIsLoading(false);
+        return;
+      }
+      const foundUser = await userRes.json();
+      
+      const res = await fetch(`/api/clubs/${selectedClub.id}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id, member_id: foundUser.id, role: memberRole })
+      });
+
+      if (res.ok) {
+        alert('Member added!');
+        setAddMemberEmail('');
+        setMemberRole('member');
+        fetchMembers(selectedClub.id);
+      } else {
+        alert('Failed to add member');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error adding member');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleRemoveMember = async (memberId: number) => {
+    if (!confirm('Remove this member?')) return;
+    try {
+      const res = await fetch(`/api/clubs/${selectedClub.id}/members/${memberId}?user_id=${user.id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        fetchMembers(selectedClub.id);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  if (selectedClub) {
+    return (
+      <div className="pb-24 pt-6 px-6 max-w-md mx-auto">
+        <button onClick={() => setSelectedClub(null)} className="mb-6 flex items-center gap-2 text-indigo-600 font-black text-sm">
+          <ChevronLeft size={20} /> Back to Clubs
+        </button>
+        
+        <h2 className="text-2xl font-black text-zinc-950 mb-6">{selectedClub.name}</h2>
+        <p className="text-sm text-zinc-600 mb-6">{selectedClub.description}</p>
+
+        <div className="bg-indigo-50 rounded-2xl p-4 border border-indigo-100 mb-6">
+          <h4 className="font-black text-sm mb-4">Add Member</h4>
+          <div className="space-y-3">
+            <input 
+              type="email"
+              placeholder="Member email"
+              className="input-field"
+              value={addMemberEmail}
+              onChange={e => setAddMemberEmail(e.target.value)}
+            />
+            <select 
+              className="input-field"
+              value={memberRole}
+              onChange={e => setMemberRole(e.target.value)}
+            >
+              <option value="member">Member</option>
+              <option value="financial_manager">Financial Manager</option>
+              <option value="head">Head</option>
+              <option value="co-head">Co-Head</option>
+              <option value="coordinator">Coordinator</option>
+            </select>
+            <button 
+              onClick={handleAddMember}
+              disabled={isLoading}
+              className="btn-primary w-full text-sm py-2"
+            >
+              {isLoading ? 'Adding...' : 'Add Member'}
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <h4 className="font-black text-sm mb-3">Members ({members.length})</h4>
+          <div className="space-y-2">
+            {members.map(m => (
+              <div key={m.id} className="flex items-center justify-between p-3 bg-white border border-zinc-100 rounded-2xl">
+                <div className="flex items-center gap-3">
+                  <img src={m.avatar_url || `https://api.dicebear.com/7.x/avataaars/svg?seed=${m.username}`} className="w-8 h-8 rounded-full" />
+                  <div>
+                    <p className="text-sm font-black">{m.full_name}</p>
+                    <p className="text-[10px] text-zinc-500">{m.role}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => handleRemoveMember(m.id)}
+                  className="text-rose-600 text-[10px] font-black hover:text-rose-700"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
+            {members.length === 0 && (
+              <p className="text-sm text-zinc-400 text-center py-4">No members yet</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pb-24 pt-6 px-6 max-w-md mx-auto">
+      <div className="flex items-center gap-4 mb-6">
+        {onBack && (
+          <button onClick={onBack} className="p-2 bg-zinc-100 rounded-full hover:bg-zinc-200">
+            <ChevronLeft size={20} />
+          </button>
+        )}
+        <h2 className="text-3xl font-black tracking-tighter">My Clubs</h2>
+      </div>
+
+      <div className="space-y-3">
+        {userClubs.map(club => (
+          <button
+            key={club.id}
+            onClick={() => handleSelectClub(club)}
+            className="w-full p-4 text-left border border-zinc-100 rounded-2xl hover:shadow-lg hover:border-indigo-200 transition-all"
+          >
+            <h4 className="font-black text-sm text-zinc-950 mb-1">{club.name}</h4>
+            <p className="text-[10px] text-zinc-500 line-clamp-1">{club.description}</p>
+          </button>
+        ))}
+
+        {userClubs.length === 0 && (
+          <div className="py-20 text-center text-zinc-300">
+            <Users size={48} className="mx-auto mb-4 opacity-20" />
+            <p className="font-bold">No clubs yet</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [resetPasswordToken, setResetPasswordToken] = useState<string | null>(null);
@@ -4896,6 +5083,7 @@ export default function App() {
           )}
           {activeTab === 'settings' && <SettingsView user={user} onLogout={() => setUser(null)} onBack={() => setActiveTab(previousTab)} setActiveTab={setActiveTab} onOpenClubRequest={() => setShowClubRequestModal(true)} />}
           {activeTab === 'club-requests' && user.role === 'council_president' && <ClubRequestsView user={user} onBack={() => setActiveTab(previousTab)} />}
+          {activeTab === 'club-management' && user.role === 'club_president' && <ClubManagementView user={user} onBack={() => setActiveTab(previousTab)} />}
         </motion.div>
       </AnimatePresence>
 
