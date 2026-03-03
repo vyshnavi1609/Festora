@@ -1043,35 +1043,38 @@ app.get("/api/role-requests/:userId", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
+    // determine whether club_id column exists so we can safely join clubs
+    const hasClubId = await queryOne("SELECT column_name FROM information_schema.columns WHERE table_name='role_requests' AND column_name='club_id'");
+    const joinClub = hasClubId ? `LEFT JOIN clubs ON role_requests.club_id = clubs.id` : '';
+    const selectClub = hasClubId ? `, clubs.name as club_name` : '';
+
     let requests;
-    // Get requests where user is the target OR where user is a higher role (can see requests they created)
     if (['admin', 'council_president', 'club_president'].includes(user.role)) {
-      requests = await query(`
-        SELECT role_requests.*, 
-               u1.full_name as requester_name, 
-               u2.full_name as target_name,
-               clubs.name as club_name
-        FROM role_requests
-        JOIN users u1 ON role_requests.requester_id = u1.id
-        JOIN users u2 ON role_requests.target_user_id = u2.id
-        LEFT JOIN clubs ON role_requests.club_id = clubs.id
-        WHERE role_requests.target_user_id = $1 OR role_requests.requester_id = $1
-        ORDER BY role_requests.created_at DESC
-      `, [req.params.userId]);
+      requests = await query(
+        `SELECT role_requests.* ${selectClub},
+               u1.full_name as requester_name,
+               u2.full_name as target_name
+         FROM role_requests
+         JOIN users u1 ON role_requests.requester_id = u1.id
+         JOIN users u2 ON role_requests.target_user_id = u2.id
+         ${joinClub}
+         WHERE role_requests.target_user_id = $1 OR role_requests.requester_id = $1
+         ORDER BY role_requests.created_at DESC`,
+        [req.params.userId]
+      );
     } else {
-      // Regular users only see requests sent to them
-      requests = await query(`
-        SELECT role_requests.*, 
-               u1.full_name as requester_name, 
-               u2.full_name as target_name,
-               clubs.name as club_name
-        FROM role_requests
-        JOIN users u1 ON role_requests.requester_id = u1.id
-        JOIN users u2 ON role_requests.target_user_id = u2.id
-        LEFT JOIN clubs ON role_requests.club_id = clubs.id
-        WHERE role_requests.target_user_id = $1
-        ORDER BY role_requests.created_at DESC
-      `, [req.params.userId]);
+      requests = await query(
+        `SELECT role_requests.* ${selectClub},
+               u1.full_name as requester_name,
+               u2.full_name as target_name
+         FROM role_requests
+         JOIN users u1 ON role_requests.requester_id = u1.id
+         JOIN users u2 ON role_requests.target_user_id = u2.id
+         ${joinClub}
+         WHERE role_requests.target_user_id = $1
+         ORDER BY role_requests.created_at DESC`,
+        [req.params.userId]
+      );
     }
     
     res.json(requests);
