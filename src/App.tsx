@@ -3211,26 +3211,30 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setForgotPasswordMessage('');
-    
-    const res = await fetch('/api/forgot-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: forgotPasswordEmail })
-    });
-    
-    const data = await res.json();
-    if (res.ok) {
-      let msg = 'Password reset email sent! Check your inbox.';
-      if (data.resetUrl) {
-        msg += ` (Link: ${data.resetUrl})`;
+    try {
+      const res = await fetch('/api/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: forgotPasswordEmail })
+      });
+      let data: any = {};
+      try { data = await res.json(); } catch (e) { /* ignore non-json */ }
+      if (res.ok) {
+        let msg = 'Password reset email sent! Check your inbox.';
+        if (data.resetUrl) {
+          msg += `\nLink: ${data.resetUrl}`;
+        }
+        setForgotPasswordMessage(msg);
+      } else {
+        let msg = data.error || 'Failed to send reset email';
+        if (data.resetUrl) {
+          msg += `\nLink: ${data.resetUrl}`;
+        }
+        setForgotPasswordMessage(msg);
       }
-      setForgotPasswordMessage(msg);
-    } else {
-      let msg = data.error;
-      if (data.resetUrl) {
-        msg += ` (Link: ${data.resetUrl})`;
-      }
-      setForgotPasswordMessage(msg);
+    } catch (err) {
+      console.error('forgot-password error', err);
+      setForgotPasswordMessage('Network error. Please try again later.');
     }
   };
 
