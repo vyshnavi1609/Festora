@@ -1942,7 +1942,17 @@ const NotificationsView = ({ user, onRead, onBack }: { user: User, onRead: () =>
         {notifications.map(notif => (
           <div 
             key={notif.id} 
-            onClick={() => handleRead(notif.id)}
+            onClick={() => {
+              handleRead(notif.id);
+              if (notif.link) {
+                // if link is just a query string, update location.search
+                if (notif.link.startsWith('?')) {
+                  window.location.search = notif.link.slice(1);
+                } else {
+                  window.location.href = notif.link;
+                }
+              }
+            }}
             className={`p-5 rounded-[32px] flex items-start gap-4 transition-all cursor-pointer border ${notif.is_read ? 'bg-white border-zinc-100 opacity-60' : 'bg-white border-indigo-100 shadow-lg shadow-indigo-50'}`}
           >
             <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${notif.type === 'role_update' ? 'bg-emerald-50 text-emerald-600' : notif.type === 'reminder' ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'}`}>
@@ -4199,6 +4209,24 @@ export default function App() {
     if (token) {
       setResetPasswordToken(token);
     }
+
+    // deep linking: event or profile
+    const ev = urlParams.get('event');
+    if (ev) {
+      const id = Number(ev);
+      if (!isNaN(id)) {
+        // will be handled once events load
+        setViewingEvent({ id, title: '', description: '', image_url: '', date: '', location: '', created_by: 0, organizer_name: '', registration_count:0, comment_count:0, views:0 } as any);
+      }
+    }
+    const prof = urlParams.get('profile');
+    if (prof) {
+      const pid = Number(prof);
+      if (!isNaN(pid)) {
+        setViewingProfileId(pid);
+        setActiveTab('profile');
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -4282,6 +4310,19 @@ export default function App() {
       return () => clearInterval(interval);
     }
   }, [user]);
+
+  // when events load and deep-link event id was set placeholder, replace with actual event
+  useEffect(() => {
+    if (viewingEvent && viewingEvent.id && events.length > 0) {
+      const full = events.find(e => e.id === viewingEvent.id);
+      if (full) {
+        setViewingEvent(full);
+      } else {
+        // try fetch specific event from server
+        fetch(`/api/events/${viewingEvent.id}`).then(r=>r.json()).then(setViewingEvent).catch(()=>{});
+      }
+    }
+  }, [events, viewingEvent]);
 
   // Fetch public events on mount so Search/Discover work before login
   useEffect(() => {

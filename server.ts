@@ -138,12 +138,15 @@ async function initializeDatabase() {
         user_id INTEGER,
         content TEXT,
         type VARCHAR(50),
+        link TEXT,
         is_read INTEGER DEFAULT 0,
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         scheduled_at TIMESTAMP,
         FOREIGN KEY(user_id) REFERENCES users(id)
       )
     `);
+    // ensure link column exists on older databases
+    await execute(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS link TEXT`);
 
     await execute(`
       CREATE TABLE IF NOT EXISTS reminders (
@@ -861,6 +864,22 @@ app.post("/api/events", async (req, res) => {
   const result = await queryOne("INSERT INTO events (title, description, image_url, date, location, category, created_by, privacy, college_code, club_id, pass, google_form_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id", [
     title, description, image_url, date, location, category || 'Social', created_by, eventPrivacy, eventCollegeCode, club_id || null, pass || null, google_form_url || null
   ]);
+
+  // if the event is for a club, notify its followers
+  if (club_id) {
+    const club = await queryOne("SELECT name FROM clubs WHERE id = $1", [club_id]);
+    const followers = await query("SELECT user_id FROM club_follows WHERE club_id = $1", [club_id]);
+    for (const f of followers) {
+      if (f.user_id === created_by) continue;
+      await execute("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [
+        f.user_id,
+        `New event posted by ${club?.name || 'your club'}`,
+        'club_event',
+        `/?event=${result.id}`
+      ]);
+    }
+  }
+
   res.json({ id: result.id });
 });
 
@@ -976,6 +995,14 @@ app.post("/api/role-requests", async (req, res) => {
     // Create role request
     const result = await queryOne("INSERT INTO role_requests (requester_id, target_user_id, requested_role, club_id) VALUES ($1, $2, $3, $4) RETURNING id", [
       requester_id, target_user_id, requested_role, club_id || null]);
+
+    // notify the approver (requester_id) that a new request needs action
+    await execute("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [
+      requester_id,
+      `New promotion request for ${requested_role.replace('_',' ')}`,
+      'role_request',
+      `/profile/${target_user_id}`
+    ]);
     
     // Send email notification
     if (targetUser.email) {
@@ -1076,10 +1103,11 @@ app.post("/api/role-requests/approve", async (req, res) => {
     
     // Create notification
     const roleDisplay = request.requested_role.replace('_', ' ');
-    await execute("INSERT INTO notifications (user_id, content, type) VALUES ($1, $2, $3)", [
+    await execute("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [
       request.target_user_id,
       `Your promotion to ${roleDisplay} has been approved!`,
-      'role_update'
+      'role_update',
+      `/profile/${request.target_user_id}`
     ]);
     
     res.json({ success: true, message: `User promoted to ${roleDisplay}` });
@@ -1111,6 +1139,13 @@ app.post("/api/role-requests/reject", async (req, res) => {
 app.get("/api/notifications/:userId", async (req, res) => {
   const notifications = await query("SELECT * FROM notifications WHERE user_id = $1 ORDER BY timestamp DESC LIMIT 20", [req.params.userId]);
   res.json(notifications);
+});
+
+// helper to fetch a single event (used for deep-linking)
+app.get("/api/events/:id", async (req, res) => {
+  const event = await queryOne("SELECT * FROM events WHERE id = $1", [req.params.id]);
+  if (event) res.json(event);
+  else res.status(404).json({ error: "Event not found" });
 });
 
 app.post("/api/notifications/:id/read", async (req, res) => {

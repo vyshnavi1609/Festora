@@ -85,6 +85,7 @@ export interface Notification {
   user_id: number;
   content: string;
   type: string;
+  link?: string; // optional URL to navigate when notification clicked
   is_read: number;
   timestamp: string;
 }
