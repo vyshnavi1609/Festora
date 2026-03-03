@@ -2654,6 +2654,14 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                   Request Membership
                 </button>
               )}
+              {targetUser?.role === 'council_president' && (
+                <button 
+                  onClick={() => sendRoleRequest(targetUser.id, 'council_president')}
+                  className="flex-1 bg-purple-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-purple-100 transition-all border border-purple-100 active:scale-95"
+                >
+                  Request Role
+                </button>
+              )}
             </>
           )}
         </div>
@@ -2705,7 +2713,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
         {showFollowers && (
           <UserListModal 
             title="Followers" 
-            users={followersList} 
+            users={followersList.filter(u => u.id !== user.id)} 
             onClose={() => setShowFollowers(false)} 
             onViewProfile={onViewProfile} 
           />
@@ -2713,7 +2721,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
         {showFollowing && (
           <UserListModal 
             title="Following" 
-            users={followingList} 
+            users={followingList.filter(u => u.id !== user.id)} 
             onClose={() => setShowFollowing(false)} 
             onViewProfile={onViewProfile} 
           />
