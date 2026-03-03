@@ -549,6 +549,24 @@ app.post("/api/forgot-password", async (req, res) => {
   }
 });
 
+// verify reset token and return account hint (email/username)
+app.get("/api/reset-password/verify", async (req, res) => {
+  const token = req.query.token as string;
+  if (!token) return res.status(400).json({ error: "Token required" });
+
+  const resetToken = await queryOne("SELECT * FROM password_reset_tokens WHERE token = $1 AND expires_at > NOW() AND used = 0", [token]);
+  if (!resetToken) {
+    return res.status(400).json({ error: "Invalid or expired reset token" });
+  }
+
+  const user = await queryOne("SELECT id, email, username, full_name FROM users WHERE id = $1", [resetToken.user_id]);
+  if (!user) {
+    return res.status(500).json({ error: "User not found" });
+  }
+
+  res.json({ user: { email: user.email, username: user.username, full_name: user.full_name } });
+});
+
 app.post("/api/reset-password", async (req, res) => {
   const { token, newPassword } = req.body;
   
@@ -1532,6 +1550,28 @@ app.delete("/api/users/:id", async (req, res) => {
   } catch (e) {
     console.error('Delete account error:', e);
     res.status(500).json({ error: "Failed to delete account", details: e.message });
+  }
+});
+
+// admin helper: directly change role
+app.post("/api/users/:id/role", async (req, res) => {
+  const targetId = req.params.id;
+  const { role } = req.body;
+  const requesterId = req.query.requester || req.headers['x-requester-id'];
+  if (!requesterId) return res.status(403).json({ error: 'Requester required' });
+  const requester = await queryOne("SELECT * FROM users WHERE id=$1", [requesterId]);
+  if (!requester || requester.role !== 'admin') {
+    return res.status(403).json({ error: 'Not authorized' });
+  }
+  if (!['admin','council_president','club_president','club_member','student'].includes(role)) {
+    return res.status(400).json({ error: 'Invalid role' });
+  }
+  try {
+    await execute("UPDATE users SET role=$1 WHERE id=$2", [role, targetId]);
+    res.json({ success: true });
+  } catch (e) {
+    console.error('role change error', e);
+    res.status(500).json({ error: 'Failed to change role' });
   }
 });
 

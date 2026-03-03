@@ -2675,6 +2675,23 @@ const AdminDashboard = ({ user }: { user: User }) => {
     fetchData();
   };
 
+  const handleChangeRole = async (targetId: number, newRole: string) => {
+    if (!window.confirm(`Change user role to ${newRole}?`)) return;
+    try {
+      const res = await fetch(`/api/users/${targetId}/role?requester=${user.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: newRole })
+      });
+      if (!res.ok) throw new Error(`status ${res.status}`);
+      alert('Role updated');
+    } catch (err) {
+      console.error('role change failed', err);
+      alert('Failed to change role');
+    }
+    fetchData();
+  };
+
   const handleDeleteUser = async (targetId: number, targetName: string) => {
     if (!window.confirm(`Are you sure you want to delete ${targetName}? This action cannot be undone.`)) {
       return;
@@ -2862,6 +2879,11 @@ const AdminDashboard = ({ user }: { user: User }) => {
                       <UserPlus size={18} />
                     </button>
                   )}
+                  {user.role === 'admin' && u.role === 'student' && (
+                    <button onClick={() => handleChangeRole(u.id, 'council_president')} className="p-2 bg-yellow-50 text-yellow-700 rounded-xl hover:bg-yellow-100 transition-colors shadow-sm">
+                      CP
+                    </button>
+                  )}
                   <button onClick={() => handleDeleteUser(u.id, u.full_name)} className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100 transition-colors shadow-sm">
                     <Trash2 size={18} />
                   </button>
@@ -3043,6 +3065,18 @@ const ResetPasswordView = ({ token, onComplete }: { token: string, onComplete: (
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [accountHint, setAccountHint] = useState<{ email?: string; username?: string; full_name?: string } | null>(null);
+
+  useEffect(() => {
+    // show hint of which account the token belongs to
+    fetch(`/api/reset-password/verify?token=${encodeURIComponent(token)}`)
+      .then(res => res.json())
+      .then(data => {
+        if (res.ok) {
+          setAccountHint(data.user);
+        }
+      }).catch(() => {});
+  }, [token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
