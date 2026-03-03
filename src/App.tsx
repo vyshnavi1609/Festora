@@ -5290,7 +5290,7 @@ export default function App() {
               onFollowSuggestion={handleFollowSuggestion}
             />
           )}
-          {activeTab === 'create' && (
+          {activeTab === 'create' && user.role !== 'student' && (
             <CreateEventView 
               user={user} 
               editingEvent={editingEvent}

@@ -1140,6 +1140,16 @@ app.post("/api/events", async (req, res) => {
       console.warn('Missing created_by field');
       return res.status(400).json({ error: "User ID is required" });
     }
+    
+    // Check if user is a student - students cannot create events
+    const user = await queryOne("SELECT role FROM users WHERE id = $1", [created_by]);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    if (user.role === 'student') {
+      return res.status(403).json({ error: "Students cannot create events" });
+    }
+    
     if (google_form_url && !google_form_url.startsWith('http')) {
       return res.status(400).json({ error: "Invalid Google Form URL" });
     }
