@@ -11,8 +11,31 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
   body {
-    @apply bg-white text-zinc-900 antialiased selection:bg-indigo-100 selection:text-indigo-900;
+    @apply bg-gradient-to-br from-white via-zinc-50 to-blue-50 text-zinc-900 antialiased selection:bg-indigo-100 selection:text-indigo-900;
+  }
+
+  /* Smooth scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgba(161, 161, 170, 0.4);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(161, 161, 170, 0.6);
   }
 }
 
@@ -35,7 +58,7 @@
   .category-concert { @apply bg-violet-50 text-violet-700 border-violet-100; }
 
   .glass-card {
-    @apply bg-white border border-zinc-100 shadow-sm;
+    @apply bg-white/80 backdrop-blur-xl border border-white/20 shadow-sm;
   }
 
   .btn-primary {
@@ -47,6 +70,56 @@
   }
 
   .card-shadow {
-    @apply shadow-[0_8px_30px_rgb(0,0,0,0.04)];
+    @apply shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_12px_40px_rgb(0,0,0,0.08)] transition-shadow duration-300;
+  }
+
+  /* Layout utilities */
+  .container {
+    @apply max-w-4xl mx-auto px-4 sm:px-6;
+  }
+
+  .safe-area-bottom {
+    @apply pb-24 sm:pb-0;
+  }
+
+  .interactive {
+    @apply transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer;
+  }
+
+  /* Page transition utilities */
+  .page-container {
+    @apply w-full pb-24 sm:pb-0;
+  }
+
+  .page-content {
+    @apply container py-6 sm:py-8;
+  }
+
+  /* Header styling */
+  .app-header {
+    @apply sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-zinc-100/50 shadow-sm;
+  }
+
+  /* Card improvements */
+  .featured-card {
+    @apply bg-white rounded-[40px] overflow-hidden border border-zinc-100 shadow-lg hover:shadow-2xl transition-all duration-300;
+  }
+
+  /* Spacing rhythm */
+  .space-y-content {
+    @apply space-y-4 sm:space-y-6;
+  }
+
+  .space-x-content {
+    @apply space-x-4 sm:space-x-6;
   }
 }
+
+/* No scrollbar utility class */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;

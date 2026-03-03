@@ -45,6 +45,8 @@ import {
   Plus,
   Activity
 } from 'lucide-react';
+
+import { Container, Card, Button } from './components';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI } from "@google/genai";
 import { QRCodeCanvas } from 'qrcode.react';
@@ -148,7 +150,7 @@ const Navbar = ({ activeTab, setActiveTab, user }: { activeTab: string, setActiv
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-zinc-100 px-4 py-2 flex justify-around items-center z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+    <nav className="hidden sm:flex fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-zinc-100/50 px-6 py-3 justify-around items-center z-50 shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
       {tabs.map((tab) => {
         if (tab.roles && (!user || !tab.roles.includes(user.role))) return null;
         const Icon = tab.icon;
@@ -156,13 +158,13 @@ const Navbar = ({ activeTab, setActiveTab, user }: { activeTab: string, setActiv
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`p-3 transition-all relative group ${activeTab === tab.id ? `${tab.color} scale-125` : 'text-zinc-400 hover:text-zinc-600'}`}
+            className={`p-3 rounded-full transition-all relative group ${activeTab === tab.id ? `${tab.color} bg-zinc-50` : 'text-zinc-400 hover:text-zinc-600 hover:bg-zinc-50'}`}
           >
-            <Icon size={24} strokeWidth={activeTab === tab.id ? 3 : 2} className="transition-transform group-active:scale-90" />
+            <Icon size={20} strokeWidth={activeTab === tab.id ? 3 : 2} className="transition-transform group-active:scale-90" />
             {activeTab === tab.id && (
               <motion.div 
                 layoutId="navDot"
-                className={`absolute -bottom-1 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full shadow-lg ${tab.color.replace('text-', 'bg-')} shadow-current`} 
+                className={`absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full shadow-lg ${tab.color.replace('text-', 'bg-')} shadow-current`} 
               />
             )}
           </button>
@@ -307,12 +309,13 @@ const EventDetailsModal = ({ isOpen, onClose, event, user, onRegister, onSave, o
 
                 <div className="mt-auto space-y-4">
                   <div className="flex gap-4">
-                    <button 
+                    <Button 
+                      variant="primary"
                       onClick={() => onRegister(event.id)}
-                      className="btn-primary flex-1 py-5 text-xs"
+                      className="flex-1 py-5 text-xs"
                     >
                       Register Now
-                    </button>
+                    </Button>
                     <button 
                       onClick={() => onSave(event.id)}
                       className="w-16 h-16 bg-zinc-50 text-zinc-400 hover:text-amber-600 rounded-2xl flex items-center justify-center transition-all border border-zinc-100 active:scale-90"
@@ -508,12 +511,13 @@ const EventCard: React.FC<EventCardProps> = ({ event, user, onRegister, onUnregi
 
           <div className="grid grid-cols-1 gap-4 mt-10">
             {!isRegistered ? (
-              <button 
+              <Button 
+                variant="primary"
                 onClick={() => onRegister(event.id)}
-                className="btn-primary w-full py-5 text-xs"
+                className="w-full py-5 text-xs"
               >
                 Register for Event
-              </button>
+              </Button>
             ) : (
               <div className="grid grid-cols-2 gap-4">
                 <button 
@@ -1212,7 +1216,7 @@ const Stories = ({ user, onViewProfile, onSendMessage }: { user: User, onViewPro
 const DiscoverView = ({ events, suggestions, user, onViewDetails, onFollowSuggestion }: { events: Event[], suggestions: User[], user: User, onViewDetails: (e: Event) => void, onFollowSuggestion: (id: number) => void }) => {
   const trending = [...events].sort((a,b) => (b.registration_count || 0) - (a.registration_count || 0)).slice(0, 12);
   return (
-    <div className="pb-24 pt-24 px-4">
+    <Container className="py-24">
       <header className="fixed top-0 left-0 right-0 bg-white pt-6 pb-4 px-6 z-50 border-b border-zinc-100">
         <div className="flex items-center">
           <h1 className="text-2xl font-black">Discover</h1>
@@ -1224,13 +1228,13 @@ const DiscoverView = ({ events, suggestions, user, onViewDetails, onFollowSugges
           <h3 className="text-sm font-black text-zinc-500 uppercase tracking-widest mb-3">Trending events</h3>
           <div className="grid grid-cols-2 gap-3">
             {trending.map(ev => (
-              <div key={ev.id} onClick={() => onViewDetails(ev)} className="cursor-pointer rounded-xl overflow-hidden border border-zinc-100 bg-white">
+              <Card key={ev.id} className="cursor-pointer" onClick={() => onViewDetails(ev)}>
                 <img src={ev.image_url || `https://picsum.photos/seed/${ev.id}/400/400`} alt={ev.title} className="w-full h-36 object-cover" />
                 <div className="p-3">
                   <p className="text-sm font-black truncate">{ev.title}</p>
                   <p className="text-[11px] text-zinc-400">{ev.location}</p>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         </div>
@@ -1248,14 +1252,14 @@ const DiscoverView = ({ events, suggestions, user, onViewDetails, onFollowSugges
                       <p className="text-[10px] text-zinc-400">@{s.username}</p>
                     </div>
                   </div>
-                  <button onClick={() => onFollowSuggestion(s.id)} className="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black">Follow</button>
+                  <Button onClick={() => onFollowSuggestion(s.id)} variant="primary" className="px-3 py-1.5 text-[10px]">Follow</Button>
                 </div>
               ))}
             </div>
           </div>
         )}
       </div>
-    </div>
+    </Container>
   );
 };
 
@@ -1307,21 +1311,21 @@ const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, o
   };
 
   return (
-    <div className="pb-24 pt-24 px-4">
-      <header className="fixed top-0 left-0 right-0 bg-white pt-8 pb-6 px-6 z-50 border-b border-zinc-100 shadow-sm">
-        <div className="flex items-center mb-6">
+    <Container variant="default" className="mb-16 sm:mb-0">
+      <header className="sticky top-0 bg-white/80 backdrop-blur-xl pt-6 pb-4 z-40 border-b border-zinc-100/50 -mx-4 sm:-mx-6 px-4 sm:px-6 mb-6">
+        <div className="flex items-center justify-between">
           <h1 className="text-3xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-indigo-500 to-rose-500">Festora</h1>
-          <div className="ml-auto flex gap-6 text-zinc-950 items-center">
+          <div className="flex gap-4 text-zinc-950 items-center">
             <button 
               onClick={() => setShowCalendar(true)}
-              className={`transition-all hover:text-indigo-600 active:scale-90`}
+              className={`p-2 transition-all hover:text-indigo-600 hover:bg-indigo-50 rounded-full active:scale-90`}
             >
-              <Calendar size={26} strokeWidth={2.5} />
+              <Calendar size={22} strokeWidth={2.5} />
             </button>
-            <button onClick={() => setActiveTab('notifications')} className="relative hover:text-rose-600 transition-all active:scale-90">
-              <Bell size={28} strokeWidth={2.5} />
+            <button onClick={() => setActiveTab('notifications')} className="relative p-2 hover:text-rose-600 hover:bg-rose-50 rounded-full transition-all active:scale-90">
+              <Bell size={22} strokeWidth={2.5} />
               {unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-600 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-lg">
+                <span className="absolute top-0 right-0 w-5 h-5 bg-rose-600 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-lg">
                   {unreadCount}
                 </span>
               )}
@@ -1333,8 +1337,8 @@ const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, o
       {/* Stories Component */}
       <Stories user={user} onViewProfile={onViewProfile} onSendMessage={onSendMessage} />
       
-      <div className="max-w-md mx-auto space-y-8">
-        <div className="space-y-2">
+      <div className="space-y-6">
+        <div className="space-y-4">
           {events.map(event => (
             <EventCard 
               key={event.id} 
@@ -1368,7 +1372,7 @@ const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, o
         onClose={() => setShowCalendar(false)} 
         events={events}
       />
-    </div>
+    </Container>
   );
 };
 
@@ -1395,7 +1399,7 @@ const SearchView = ({ events, user, suggestions, onRegister, onUnregister, onSav
   });
 
   return (
-    <div className="pb-24 pt-24 px-4">
+    <Container className="py-24">
       <header className="fixed top-0 left-0 right-0 bg-white pt-6 pb-4 px-6 z-50 border-b border-zinc-100">
         <div className="flex gap-2 items-center">
           {onBack && (
@@ -1481,18 +1485,20 @@ const SearchView = ({ events, user, suggestions, onRegister, onUnregister, onSav
                 </div>
 
                 <div className="flex gap-3 pt-4">
-                  <button 
+                  <Button 
+                    variant="secondary"
                     onClick={() => { setFilterCategory(''); setFilterDate(''); setFilterLocation(''); }}
-                    className="flex-1 py-4 bg-zinc-100 text-zinc-600 rounded-2xl text-sm font-black uppercase tracking-widest"
+                    className="flex-1 py-4 text-sm uppercase"
                   >
                     Reset
-                  </button>
-                  <button 
+                  </Button>
+                  <Button 
+                    variant="primary"
                     onClick={() => setShowFilters(false)}
-                    className="flex-1 py-4 festora-gradient text-white rounded-2xl text-sm font-black uppercase tracking-widest shadow-xl shadow-indigo-100"
+                    className="flex-1 py-4 text-sm uppercase"
                   >
                     Apply
-                  </button>
+                  </Button>
                 </div>
               </div>
             </motion.div>
@@ -1507,7 +1513,7 @@ const SearchView = ({ events, user, suggestions, onRegister, onUnregister, onSav
             <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-600 mb-4">Suggested For You</h3>
             <div className="space-y-3">
               {suggestions.slice(0, 5).map(sug => (
-                <div key={sug.id} className="flex items-center justify-between p-3 bg-zinc-50 rounded-2xl hover:bg-white transition-all border border-zinc-100">
+                <div key={sug.id} className="flex items-center justify-between p-3 bg-zinc-50 rounded-2xl hover:bg-white transition-all border border-zinc-100 interactive">
                   <div 
                     className="flex items-center gap-3 cursor-pointer flex-1"
                     onClick={() => onViewProfile(sug.id)}
@@ -1536,8 +1542,7 @@ const SearchView = ({ events, user, suggestions, onRegister, onUnregister, onSav
       )}
       
       <div className="max-w-md mx-auto grid grid-cols-3 gap-1.5 mt-6">
-        {filteredEvents.map(event => (
-          <div 
+        {filteredEvents.map(event => (          <div 
             key={event.id} 
             className="aspect-square bg-zinc-100 overflow-hidden relative group cursor-pointer rounded-xl border border-zinc-100/50 card-shadow"
             onClick={() => onViewDetails(event)}
@@ -1593,7 +1598,7 @@ const SearchView = ({ events, user, suggestions, onRegister, onUnregister, onSav
           </div>
         )}
       </div>
-    </div>
+    </Container>
   );
 };
 
@@ -3227,7 +3232,7 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
                 </button>
               </div>
               {error && <p className="text-red-500 text-[10px] text-center font-black uppercase tracking-widest">{error}</p>}
-              <button type="submit" className="btn-primary w-full py-5 text-xs">Log In</button>
+              <Button type="submit" variant="primary" className="w-full py-5 text-xs">Log In</Button>
               <div className="flex justify-center pt-4">
                 <button 
                   type="button" 
@@ -3278,7 +3283,7 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
                     </button>
                   </div>
                   {error && <p className="text-red-500 text-[10px] text-center font-black uppercase tracking-widest">{error}</p>}
-                  <button onClick={nextStep} className="btn-primary w-full py-5 text-xs">Next Step</button>
+                  <Button onClick={nextStep} variant="primary" className="w-full py-5 text-xs">Next Step</Button>
                 </div>
               )}
 
@@ -3391,7 +3396,7 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
                   {error && <p className="text-red-500 text-[10px] text-center font-black uppercase tracking-widest">{error}</p>}
                   <div className="flex gap-3">
                     <button onClick={prevStep} className="flex-1 bg-zinc-100 text-zinc-600 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest">Back</button>
-                    <button onClick={nextStep} className="flex-[2] btn-primary py-5 text-xs">Final Step</button>
+                    <Button onClick={nextStep} variant="primary" className="flex-[2] py-5 text-xs">Final Step</Button>
                   </div>
                 </div>
               )}
@@ -3426,7 +3431,7 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
                   
                   <div className="flex gap-3">
                     <button onClick={prevStep} className="flex-1 bg-zinc-100 text-zinc-600 py-5 rounded-2xl text-[10px] font-black uppercase tracking-widest">Back</button>
-                    <button onClick={() => handleSubmit()} className="flex-[2] btn-primary py-5 text-xs">Complete Sign Up</button>
+                    <Button onClick={() => handleSubmit()} variant="primary" className="flex-[2] py-5 text-xs">Complete Sign Up</Button>
                   </div>
                 </div>
               )}
@@ -3481,7 +3486,7 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
                 >
                   Cancel
                 </button>
-                <button type="submit" className="flex-1 btn-primary py-3 text-xs">Send Reset Email</button>
+                <Button type="submit" variant="primary" className="flex-1 py-3 text-xs">Send Reset Email</Button>
               </div>
             </form>
           </motion.div>
@@ -3583,7 +3588,7 @@ const SettingsView = ({ user, onLogout, onBack, setActiveTab }: { user: User, on
                 </label>
               </div>
               <div className="mt-6 flex gap-2">
-                <button onClick={() => setModal(null)} className="btn-primary flex-1 py-3">Done</button>
+                <Button onClick={() => setModal(null)} variant="primary" className="flex-1 py-3">Done</Button>
               </div>
             </motion.div>
           </motion.div>
@@ -4199,8 +4204,8 @@ export default function App() {
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <div className="min-h-screen bg-zinc-50 font-sans text-zinc-900 flex flex-col items-center">
-      <div className="w-full max-w-4xl">
+    <div className="min-h-screen bg-gradient-to-br from-white via-zinc-50 to-blue-50 font-sans text-zinc-900 flex flex-col items-center">
+      <div className="w-full max-w-4xl flex-1">
         <AnimatePresence>
         {toast && (
           <motion.div 

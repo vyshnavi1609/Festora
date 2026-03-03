@@ -63,8 +63,11 @@ export interface RoleRequest {
   target_user_id: number;
   requested_role: Role;
   status: 'pending' | 'approved' | 'rejected';
+  club_id?: number;
+  club_name?: string;
   requester_name: string;
   target_name: string;
+  created_at?: string;
 }
 
 export interface Message {

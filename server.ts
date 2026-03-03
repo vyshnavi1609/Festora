@@ -55,6 +55,7 @@ async function initializeDatabase() {
         capacity INTEGER,
         pass VARCHAR(255),
         qr_code TEXT,
+        google_form_url TEXT,
         FOREIGN KEY(created_by) REFERENCES users(id)
       )
     `);
@@ -101,8 +102,11 @@ async function initializeDatabase() {
         target_user_id INTEGER,
         requested_role VARCHAR(50),
         status VARCHAR(50) DEFAULT 'pending',
+        club_id INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(requester_id) REFERENCES users(id),
-        FOREIGN KEY(target_user_id) REFERENCES users(id)
+        FOREIGN KEY(target_user_id) REFERENCES users(id),
+        FOREIGN KEY(club_id) REFERENCES clubs(id)
       )
     `);
 
@@ -258,12 +262,14 @@ async function initializeDatabase() {
     await execute(`
       CREATE TABLE IF NOT EXISTS clubs (
         id SERIAL PRIMARY KEY,
-        name VARCHAR(255) UNIQUE,
+        name VARCHAR(255),
         description TEXT,
         logo_url TEXT,
         president_id INTEGER,
         created_by INTEGER,
+        college_code VARCHAR(50),
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(name, college_code),
         FOREIGN KEY(president_id) REFERENCES users(id),
         FOREIGN KEY(created_by) REFERENCES users(id)
       )
@@ -550,25 +556,26 @@ app.post("/api/reset-password", async (req, res) => {
 
 // Club Management Routes
 app.post("/api/clubs", async (req, res) => {
-  const { name, description, logo_url, president_id, user_id } = req.body;
+  const { name, description, logo_url, president_id, user_id, college_code } = req.body;
   
-  // Only student president or admin can create clubs
-  const requester = await queryOne("SELECT role FROM users WHERE id = $1", [user_id]);
-  if (!requester || (requester.role !== 'student_president' && requester.role !== 'admin')) {
-    return res.status(403).json({ error: "Only student president can create clubs" });
+  // Only council_president or admin can create clubs
+  const requester = await queryOne("SELECT role, college_name FROM users WHERE id = $1", [user_id]);
+  if (!requester || (requester.role !== 'council_president' && requester.role !== 'admin')) {
+    return res.status(403).json({ error: "Only council president or admin can create clubs" });
+  }
+
+  // Validate college_code
+  if (!college_code) {
+    return res.status(400).json({ error: "college_code is required" });
   }
   
   try {
-    await execute("INSERT INTO clubs (name, description, logo_url, president_id, created_by) VALUES ($1, $2, $3, $4, $5)", [
-      name, description, logo_url, president_id, user_id
+    const club = await queryOne("INSERT INTO clubs (name, description, logo_url, president_id, created_by, college_code) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id", [
+      name, description, logo_url, president_id, user_id, college_code
     ]);
     
     // Add president as club member
-    const club = await queryOne("SELECT id FROM clubs WHERE name = $1", [name]);
     await execute("INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3)", [club.id, president_id, 'president']);
-    
-    // Update user role to club_president if not already
-    await execute("UPDATE users SET role = 'club_president' WHERE id = $1", [president_id]);
     
     res.json({ message: "Club created successfully", club });
   } catch (error) {
@@ -577,8 +584,62 @@ app.post("/api/clubs", async (req, res) => {
 });
 
 app.get("/api/clubs", async (req, res) => {
-  const clubs = await query("SELECT * FROM clubs", []);
-  res.json(clubs);
+  const { college_code } = req.query;
+  
+  try {
+    if (college_code) {
+      const clubs = await query("SELECT * FROM clubs WHERE college_code = $1", [college_code]);
+      res.json(clubs);
+    } else {
+      const clubs = await query("SELECT * FROM clubs", []);
+      res.json(clubs);
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get users eligible for promotion by current user
+app.get("/api/promotable-users/:userId", async (req, res) => {
+  try {
+    const requester = await queryOne("SELECT role, college_name FROM users WHERE id = $1", [req.params.userId]);
+    if (!requester) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    const roleHierarchy = {
+      'admin': 'council_president',
+      'council_president': 'club_president',
+      'club_president': 'club_member',
+      'club_member': null,
+      'student': null
+    };
+
+    const nextRole = roleHierarchy[requester.role];
+    if (!nextRole) {
+      return res.json([]); // No one can be promoted beyond this role
+    }
+
+    // Get users who don't have this role yet and are from same college
+    const users = await query(
+      "SELECT id, full_name, email, role, college_name FROM users WHERE role != $1 AND college_name = $2 ORDER BY full_name",
+      [nextRole, requester.college_name]
+    );
+    
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get clubs for a specific college
+app.get("/api/clubs-by-college/:collegeCode", async (req, res) => {
+  try {
+    const clubs = await query("SELECT id, name, description, logo_url FROM clubs WHERE college_code = $1", [req.params.collegeCode]);
+    res.json(clubs);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get("/api/clubs/:id", async (req, res) => {
@@ -757,27 +818,33 @@ app.get("/api/analytics/:userId", async (req, res) => {
 
 
 app.post("/api/events", async (req, res) => {
-  const { title, description, image_url, date, location, category, created_by, privacy, college_code, club_id, pass } = req.body;
+  const { title, description, image_url, date, location, category, created_by, privacy, college_code, club_id, pass, google_form_url } = req.body;
   if (!title || !description || !date || !location) {
     return res.status(400).json({ error: "All fields are required" });
   }
+  if (google_form_url && !google_form_url.startsWith('http')) {
+    return res.status(400).json({ error: "Invalid Google Form URL" });
+  }
   const eventPrivacy = privacy === 'private' ? 'private' : 'social';
   const eventCollegeCode = eventPrivacy === 'private' ? (college_code || null) : null;
-  const result = await queryOne("INSERT INTO events (title, description, image_url, date, location, category, created_by, privacy, college_code, club_id, pass) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id", [
-    title, description, image_url, date, location, category || 'Social', created_by, eventPrivacy, eventCollegeCode, club_id || null, pass || null
+  const result = await queryOne("INSERT INTO events (title, description, image_url, date, location, category, created_by, privacy, college_code, club_id, pass, google_form_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id", [
+    title, description, image_url, date, location, category || 'Social', created_by, eventPrivacy, eventCollegeCode, club_id || null, pass || null, google_form_url || null
   ]);
   res.json({ id: result.id });
 });
 
 app.put("/api/events/:id", async (req, res) => {
-  const { title, description, image_url, date, location, category, privacy, college_code, pass } = req.body;
+  const { title, description, image_url, date, location, category, privacy, college_code, pass, google_form_url } = req.body;
   if (!title || !description || !date || !location) {
     return res.status(400).json({ error: "All fields are required" });
   }
+  if (google_form_url && !google_form_url.startsWith('http')) {
+    return res.status(400).json({ error: "Invalid Google Form URL" });
+  }
   const eventPrivacy = privacy === 'private' ? 'private' : 'social';
   const eventCollegeCode = eventPrivacy === 'private' ? (college_code || null) : null;
-  await execute("UPDATE events SET title = $1, description = $2, image_url = $3, date = $4, location = $5, category = $6, privacy = $7, college_code = $8, pass = $9 WHERE id = $10", [
-    title, description, image_url, date, location, category, eventPrivacy, eventCollegeCode, pass || null, req.params.id
+  await execute("UPDATE events SET title = $1, description = $2, image_url = $3, date = $4, location = $5, category = $6, privacy = $7, college_code = $8, pass = $9, google_form_url = $10 WHERE id = $11", [
+    title, description, image_url, date, location, category, eventPrivacy, eventCollegeCode, pass || null, google_form_url || null, req.params.id
   ]);
   res.json({ success: true });
 });
@@ -831,28 +898,67 @@ app.get("/api/users/:id", async (req, res) => {
   }
 });
 
+// Hierarchical Role Promotion: admin -> council_president -> club_president -> club_member
+const roleHierarchy = {
+  'admin': ['council_president'],
+  'council_president': ['club_president'],
+  'club_president': ['club_member'],
+  'club_member': [],
+  'student': []
+};
+
 app.post("/api/role-requests", async (req, res) => {
-  const { requester_id, target_user_id, requested_role } = req.body;
+  const { requester_id, target_user_id, requested_role, club_id } = req.body;
   try {
-    const result = await queryOne("INSERT INTO role_requests (requester_id, target_user_id, requested_role) VALUES ($1, $2, $3) RETURNING id", [
-      requester_id, target_user_id, requested_role]);
-    
-    // Get user details for email
-    const requester = await queryOne("SELECT full_name FROM users WHERE id = $1", [requester_id]);
-    const targetUser = await queryOne("SELECT email, full_name FROM users WHERE id = $1", [target_user_id]);
+    // Validate requester exists and get their role
+    const requester = await queryOne("SELECT role, college_name FROM users WHERE id = $1", [requester_id]);
+    if (!requester) {
+      return res.status(404).json({ error: "Requester not found" });
+    }
+
+    // Validate target user exists
+    const targetUser = await queryOne("SELECT email, full_name, college_name FROM users WHERE id = $1", [target_user_id]);
+    if (!targetUser) {
+      return res.status(404).json({ error: "Target user not found" });
+    }
+
+    // Check if requester can promote to this role (hierarchy check)
+    const allowedRoles = roleHierarchy[requester.role] || [];
+    if (!allowedRoles.includes(requested_role)) {
+      return res.status(403).json({ error: `Your role ${requester.role} cannot promote to ${requested_role}. Allowed roles: ${allowedRoles.join(', ')}` });
+    }
+
+    // If promoting to club_president, club_id is required and club must be in same college
+    if (requested_role === 'club_president') {
+      if (!club_id) {
+        return res.status(400).json({ error: "club_id is required when promoting to club_president" });
+      }
+      const club = await queryOne("SELECT college_code FROM clubs WHERE id = $1", [club_id]);
+      if (!club) {
+        return res.status(404).json({ error: "Club not found" });
+      }
+      if (club.college_code !== requester.college_name) {
+        return res.status(403).json({ error: "Can only promote to clubs in your college" });
+      }
+    }
+
+    // Create role request
+    const result = await queryOne("INSERT INTO role_requests (requester_id, target_user_id, requested_role, club_id) VALUES ($1, $2, $3, $4) RETURNING id", [
+      requester_id, target_user_id, requested_role, club_id || null]);
     
     // Send email notification
     if (targetUser.email) {
       try {
+        const roleDetail = requested_role === 'club_president' ? 'Club President' : requested_role.replace('_', ' ');
         await emailTransporter.sendMail({
           from: process.env.EMAIL_FROM,
           to: targetUser.email,
-          subject: `Role Request - ${requested_role}`,
+          subject: `Role Promotion Request - ${roleDetail}`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #6366f1;">Role Request Received</h2>
+              <h2 style="color: #6366f1;">Role Promotion Request</h2>
               <p>Hi ${targetUser.full_name},</p>
-              <p><strong>${requester.full_name}</strong> has requested to assign you the role of <strong>${requested_role}</strong>.</p>
+              <p><strong>${requester.full_name}</strong> has sent you a promotion request for the role of <strong>${roleDetail}</strong>.</p>
               <p>Please log in to your Festora account to approve or reject this request.</p>
               <p>Best regards,<br>Festora Team</p>
             </div>
@@ -863,7 +969,7 @@ app.post("/api/role-requests", async (req, res) => {
       }
     }
     
-    res.json({ id: result.id });
+    res.json({ id: result.id, message: "Promotion request sent" });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -871,15 +977,42 @@ app.post("/api/role-requests", async (req, res) => {
 
 app.get("/api/role-requests/:userId", async (req, res) => {
   try {
-    const requests = await query(`
-      SELECT role_requests.*, u1.full_name as requester_name, u2.full_name as target_name
-      FROM role_requests
-      JOIN users u1 ON role_requests.requester_id = u1.id
-      JOIN users u2 ON role_requests.target_user_id = u2.id
-      WHERE role_requests.target_user_id = $1 OR (
-        SELECT role FROM users WHERE id = $2
-      ) IN ('admin', 'council_president', 'club_president')
-    `, [req.params.userId, req.params.userId]);
+    const user = await queryOne("SELECT role FROM users WHERE id = $1", [req.params.userId]);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    let requests;
+    // Get requests where user is the target OR where user is a higher role (can see requests they created)
+    if (['admin', 'council_president', 'club_president'].includes(user.role)) {
+      requests = await query(`
+        SELECT role_requests.*, 
+               u1.full_name as requester_name, 
+               u2.full_name as target_name,
+               clubs.name as club_name
+        FROM role_requests
+        JOIN users u1 ON role_requests.requester_id = u1.id
+        JOIN users u2 ON role_requests.target_user_id = u2.id
+        LEFT JOIN clubs ON role_requests.club_id = clubs.id
+        WHERE role_requests.target_user_id = $1 OR role_requests.requester_id = $1
+        ORDER BY role_requests.created_at DESC
+      `, [req.params.userId]);
+    } else {
+      // Regular users only see requests sent to them
+      requests = await query(`
+        SELECT role_requests.*, 
+               u1.full_name as requester_name, 
+               u2.full_name as target_name,
+               clubs.name as club_name
+        FROM role_requests
+        JOIN users u1 ON role_requests.requester_id = u1.id
+        JOIN users u2 ON role_requests.target_user_id = u2.id
+        LEFT JOIN clubs ON role_requests.club_id = clubs.id
+        WHERE role_requests.target_user_id = $1
+        ORDER BY role_requests.created_at DESC
+      `, [req.params.userId]);
+    }
+    
     res.json(requests);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -890,21 +1023,35 @@ app.post("/api/role-requests/approve", async (req, res) => {
   const { requestId } = req.body;
   try {
     const request = await queryOne("SELECT * FROM role_requests WHERE id = $1", [requestId]);
-    if (request) {
-      await execute("UPDATE users SET role = $1 WHERE id = $2", [request.requested_role, request.target_user_id]);
-      await execute("UPDATE role_requests SET status = 'approved' WHERE id = $1", [requestId]);
-      
-      // Create notification
-      await execute("INSERT INTO notifications (user_id, content, type) VALUES ($1, $2, $3)", [
-        request.target_user_id,
-        `Your request for ${request.requested_role.replace('_', ' ')} has been approved!`,
-        'role_update'
-      ]);
-      
-      res.json({ success: true });
-    } else {
-      res.status(404).json({ error: "Request not found" });
+    if (!request) {
+      return res.status(404).json({ error: "Request not found" });
     }
+
+    // Update user role
+    await execute("UPDATE users SET role = $1 WHERE id = $2", [request.requested_role, request.target_user_id]);
+    
+    // If promoted to club_president, add as club president and club member
+    if (request.requested_role === 'club_president' && request.club_id) {
+      await execute("UPDATE clubs SET president_id = $1 WHERE id = $2", [request.target_user_id, request.club_id]);
+      await execute("INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (club_id, user_id) DO UPDATE SET role = 'president'", [request.club_id, request.target_user_id, 'president']);
+    }
+
+    // If promoted to club_member, add to the club
+    if (request.requested_role === 'club_member' && request.club_id) {
+      await execute("INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (club_id, user_id) DO UPDATE SET role = 'member'", [request.club_id, request.target_user_id, 'member']);
+    }
+    
+    await execute("UPDATE role_requests SET status = 'approved' WHERE id = $1", [requestId]);
+    
+    // Create notification
+    const roleDisplay = request.requested_role.replace('_', ' ');
+    await execute("INSERT INTO notifications (user_id, content, type) VALUES ($1, $2, $3)", [
+      request.target_user_id,
+      `Your promotion to ${roleDisplay} has been approved!`,
+      'role_update'
+    ]);
+    
+    res.json({ success: true, message: `User promoted to ${roleDisplay}` });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -979,14 +1126,29 @@ app.post("/api/messages", async (req, res) => {
 app.post("/api/register-event", async (req, res) => {
   const { user_id, event_id } = req.body;
   
+  // Get event details
+  const event = await queryOne("SELECT google_form_url, title FROM events WHERE id = $1", [event_id]);
+  if (!event) {
+    return res.status(404).json({ error: "Event not found" });
+  }
+  
+  // If event has Google Form URL, return it for frontend to open
+  if (event.google_form_url) {
+    return res.json({ 
+      success: true, 
+      registration_url: event.google_form_url,
+      message: "Opening registration form"
+    });
+  }
+  
+  // Fallback: Internal registration (for events without Google Form)
   // Check if user is already registered or waitlisted
   const existingReg = await queryOne("SELECT * FROM registrations WHERE user_id = $1 AND event_id = $2 AND status IN ('registered', 'waitlisted')", [user_id, event_id]);
   if (existingReg) {
     return res.status(400).json({ error: "Already registered or waitlisted for this event" });
   }
   
-  // Get event details and user email
-  const event = await queryOne("SELECT * FROM events WHERE id = $1", [event_id]);
+  // Get user email
   const user = await queryOne("SELECT email, full_name FROM users WHERE id = $1", [user_id]);
   const currentRegistrations = await queryOne("SELECT COUNT(*) as count FROM registrations WHERE event_id = $1 AND status = 'registered'", [event_id]);
   
