@@ -1131,34 +1131,44 @@ app.get("/api/analytics/:userId", async (req, res) => {
 
 app.post("/api/events", async (req, res) => {
   const { title, description, image_url, date, location, category, created_by, privacy, college_code, club_id, pass, google_form_url } = req.body;
-  if (!title || !description || !date || !location) {
-    return res.status(400).json({ error: "All fields are required" });
-  }
-  if (google_form_url && !google_form_url.startsWith('http')) {
-    return res.status(400).json({ error: "Invalid Google Form URL" });
-  }
-  const eventPrivacy = privacy === 'private' ? 'private' : 'social';
-  const eventCollegeCode = eventPrivacy === 'private' ? (college_code || null) : null;
-  const result = await queryOne("INSERT INTO events (title, description, image_url, date, location, category, created_by, privacy, college_code, club_id, pass, google_form_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id", [
-    title, description, image_url, date, location, category || 'Social', created_by, eventPrivacy, eventCollegeCode, club_id || null, pass || null, google_form_url || null
-  ]);
-
-  // if the event is for a club, notify its followers
-  if (club_id) {
-    const club = await queryOne("SELECT name FROM clubs WHERE id = $1", [club_id]);
-    const followers = await query("SELECT user_id FROM club_follows WHERE club_id = $1", [club_id]);
-    for (const f of followers) {
-      if (f.user_id === created_by) continue;
-      await execute("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [
-        f.user_id,
-        `New event posted by ${club?.name || 'your club'}`,
-        'club_event',
-        `/?event=${result.id}`
-      ]);
+  try {
+    if (!title || !description || !date || !location) {
+      console.warn('Missing required fields:', { title: !!title, description: !!description, date: !!date, location: !!location });
+      return res.status(400).json({ error: "All fields are required" });
     }
-  }
+    if (!created_by) {
+      console.warn('Missing created_by field');
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    if (google_form_url && !google_form_url.startsWith('http')) {
+      return res.status(400).json({ error: "Invalid Google Form URL" });
+    }
+    const eventPrivacy = privacy === 'private' ? 'private' : 'social';
+    const eventCollegeCode = eventPrivacy === 'private' ? (college_code || null) : null;
+    const result = await queryOne("INSERT INTO events (title, description, image_url, date, location, category, created_by, privacy, college_code, club_id, pass, google_form_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id", [
+      title, description, image_url, date, location, category || 'Social', created_by, eventPrivacy, eventCollegeCode, club_id || null, pass || null, google_form_url || null
+    ]);
 
-  res.json({ id: result.id });
+    // if the event is for a club, notify its followers
+    if (club_id) {
+      const club = await queryOne("SELECT name FROM clubs WHERE id = $1", [club_id]);
+      const followers = await query("SELECT user_id FROM club_follows WHERE club_id = $1", [club_id]);
+      for (const f of followers) {
+        if (f.user_id === created_by) continue;
+        await execute("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [
+          f.user_id,
+          `New event posted by ${club?.name || 'your club'}`,
+          'club_event',
+          `/?event=${result.id}`
+        ]);
+      }
+    }
+
+    res.json({ id: result.id, success: true });
+  } catch (err) {
+    console.error('Error creating event:', err.message);
+    res.status(500).json({ error: err.message || 'Failed to create event' });
+  }
 });
 
 app.put("/api/events/:id", async (req, res) => {
@@ -1696,35 +1706,41 @@ app.get("/api/stories", async (req, res) => {
   
   // Get stories from users this user follows, plus their own stories
   // Respect visibility settings: 'everyone' visible to all, 'followers' only to followers
-  const stories = await query(`
-  SELECT s.*, u.username, u.full_name, u.avatar_url,
-         COUNT(sv.id) as view_count,
-         CASE WHEN sv2.viewer_id IS NOT NULL THEN 1 ELSE 0 END as viewed_by_me
-  FROM stories s
-  JOIN users u ON s.user_id = u.id
-  LEFT JOIN story_views sv ON s.id = sv.story_id
-  LEFT JOIN story_views sv2 ON s.id = sv2.story_id AND sv2.viewer_id = $1
-  WHERE s.expires_at > NOW()
-  AND (
-    -- Can see own stories
-    s.user_id = $2 
-    -- OR stories from people you follow (respect visibility)
-    OR (s.user_id IN (SELECT following_id FROM follows WHERE follower_id = $3)
-      AND s.visibility IN ('everyone', 'followers'))
-    -- OR public stories from anyone else
-    OR (s.visibility = 'everyone')
-  )
-  AND u.role != 'admin'
-  GROUP BY 
-    s.id,
-    u.username,
-    u.full_name,
-    u.avatar_url,
-    sv2.viewer_id
-  ORDER BY s.created_at DESC
-`, [userId, userId, userId]);
-  
-  res.json(stories);
+  try {
+    const stories = await query(`
+    SELECT s.*, u.username, u.full_name, u.avatar_url,
+           COUNT(DISTINCT sv.id) as view_count,
+           CASE WHEN sv2.viewer_id IS NOT NULL THEN 1 ELSE 0 END as viewed_by_me
+    FROM stories s
+    JOIN users u ON s.user_id = u.id
+    LEFT JOIN story_views sv ON s.id = sv.story_id
+    LEFT JOIN story_views sv2 ON s.id = sv2.story_id AND sv2.viewer_id = $1
+    WHERE s.expires_at > NOW()
+    AND (
+      -- Can see own stories
+      s.user_id = $2 
+      -- OR stories from people you follow (respect visibility)
+      OR (s.user_id IN (SELECT following_id FROM follows WHERE follower_id = $3)
+        AND s.visibility IN ('everyone', 'followers'))
+      -- OR public stories from anyone else
+      OR (s.visibility = 'everyone')
+    )
+    AND u.role != 'admin'
+    GROUP BY 
+      s.id,
+      u.id,
+      u.username,
+      u.full_name,
+      u.avatar_url,
+      sv2.viewer_id
+    ORDER BY s.created_at DESC
+  `, [userId, userId, userId]);
+    
+    res.json(stories);
+  } catch (err) {
+    console.error('Error fetching stories:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.post("/api/stories/:storyId/view", async (req, res) => {

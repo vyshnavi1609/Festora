@@ -850,26 +850,35 @@ const Stories = ({ user, onViewProfile, onSendMessage }: { user: User, onViewPro
     if (storyType === 'text' && !storyContent.trim()) return;
     if (storyType === 'image' && !selectedImage) return;
 
-    const res = await fetch('/api/stories', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        content_type: storyType,
-        content: storyType === 'image' ? selectedImage : storyContent,
-        background_color: backgroundColor,
-        text_color: textColor,
-        font_size: fontSize,
-        visibility: storyVisibility
-      })
-    });
+    try {
+      const res = await fetch('/api/stories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content_type: storyType,
+          content: storyType === 'image' ? selectedImage : storyContent,
+          background_color: backgroundColor,
+          text_color: textColor,
+          font_size: fontSize,
+          visibility: storyVisibility
+        })
+      });
 
-    if (res.ok) {
-      setShowCreateStory(false);
-      setStoryContent('');
-      setSelectedImage(null);
-      setStoryType('text');
-      setStoryVisibility('everyone');
-      fetchStories();
+      if (res.ok) {
+        setShowCreateStory(false);
+        setStoryContent('');
+        setSelectedImage(null);
+        setStoryType('text');
+        setStoryVisibility('everyone');
+        fetchStories();
+      } else {
+        const err = await res.json().catch(() => null);
+        console.error('Failed to post story:', err);
+        alert((err && err.error) || 'Failed to post story');
+      }
+    } catch (err) {
+      console.error('Story creation error:', err);
+      alert('Failed to post story. Check console for details.');
     }
   };
 
