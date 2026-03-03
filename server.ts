@@ -109,6 +109,9 @@ async function initializeDatabase() {
         FOREIGN KEY(club_id) REFERENCES clubs(id)
       )
     `);
+    // some deployments might have created the table before club_id was added
+    await execute(`ALTER TABLE role_requests ADD COLUMN IF NOT EXISTS club_id INTEGER`);
+    // we don't attempt to re-add the FK constraint; it's non‑critical and may already exist
 
     await execute(`
       CREATE TABLE IF NOT EXISTS messages (
