@@ -507,7 +507,9 @@ app.post("/api/forgot-password", async (req, res) => {
   await execute("INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)", [user.id, token, expiresAt.toISOString()]);
   
   // Send email
-  const resetUrl = `${process.env.APP_URL}/reset-password?token=${token}`;
+  // build reset url; fall back to request origin or localhost
+  const baseUrl = process.env.APP_URL || req.headers.origin || `http://localhost:${process.env.PORT||5173}`;
+  const resetUrl = `${baseUrl.replace(/\/$/, '')}/reset-password?token=${token}`;
   const mailOptions = {
     from: `Festora <${process.env.EMAIL_FROM}>`,
     to: email,
@@ -525,6 +527,13 @@ app.post("/api/forgot-password", async (req, res) => {
     `
   };
   
+  // if SMTP not configured, skip sending and just return link
+  const smtpHost = process.env.EMAIL_HOST;
+  if (!smtpHost) {
+    console.warn('SMTP not configured, skipping email');
+    return res.json({ message: 'SMTP not configured – link generated', resetUrl });
+  }
+
   try {
     console.log('Attempting to send email to:', email);
     console.log('Using SMTP config:', {
