@@ -345,6 +345,17 @@ app.get("/debug/users", async (req, res) => {
   }
 });
 
+// Delete all non-admin users (for testing)
+app.delete("/debug/clear-users", async (req, res) => {
+  try {
+    const result = await execute("DELETE FROM users WHERE role != 'admin'", []);
+    res.json({ message: `Deleted ${result} non-admin users. Admin preserved.` });
+  } catch (err) {
+    console.error("Clear users error:", err);
+    res.status(500).json({ error: "Failed to clear users" });
+  }
+});
+
 // Club Follows
 app.post("/api/club-follows", async (req, res) => {
   const { user_id, club_id } = req.body;
