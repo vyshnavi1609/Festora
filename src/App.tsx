@@ -2647,12 +2647,20 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                 </button>
               </div>
               {targetUser?.role === 'club_president' && (
-                <button 
-                  onClick={() => sendRoleRequest(targetUser.id, 'club_member')}
-                  className="flex-1 bg-rose-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all border border-rose-100 active:scale-95"
-                >
-                  Request Membership
-                </button>
+                <>
+                  <button 
+                    onClick={() => sendRoleRequest(targetUser.id, 'club_member')}
+                    className="flex-1 bg-rose-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all border border-rose-100 active:scale-95"
+                  >
+                    Request Membership
+                  </button>
+                  <button 
+                    onClick={() => sendRoleRequest(targetUser.id, 'club_president')}
+                    className="flex-1 bg-amber-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-100 transition-all border border-amber-100 active:scale-95"
+                  >
+                    Request Role
+                  </button>
+                </>
               )}
               {targetUser?.role === 'council_president' && (
                 <button 
