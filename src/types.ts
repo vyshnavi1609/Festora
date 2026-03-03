@@ -89,3 +89,39 @@ export interface Notification {
   is_read: number;
   timestamp: string;
 }
+
+export interface Club {
+  id: number;
+  name: string;
+  description: string;
+  logo_url?: string;
+  president_id: number;
+  created_by: number;
+  college_code: string;
+  created_at?: string;
+}
+
+export interface ClubRequest {
+  id: number;
+  requester_id: number;
+  club_name: string;
+  club_description: string;
+  club_image_url?: string;
+  in_charge_name: string;
+  in_charge_email: string;
+  related_to: string;
+  college_code: string;
+  status: 'pending' | 'approved' | 'rejected';
+  requested_at: string;
+  reviewed_at?: string;
+  reviewed_by?: number;
+  requester_name?: string;
+}
+
+export interface ClubMember {
+  id: number;
+  club_id: number;
+  user_id: number;
+  role: string; // custom role like 'financial_manager', 'head', 'president', etc.
+  joined_at: string;
+}

@@ -1957,8 +1957,8 @@ const NotificationsView = ({ user, onRead, onBack }: { user: User, onRead: () =>
             }}
             className={`p-5 rounded-[32px] flex items-start gap-4 transition-all cursor-pointer border ${notif.is_read ? 'bg-white border-zinc-100 opacity-60' : 'bg-white border-indigo-100 shadow-lg shadow-indigo-50'}`}
           >
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${notif.type === 'role_update' ? 'bg-emerald-50 text-emerald-600' : notif.type === 'reminder' ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'}`}>
-              {notif.type === 'role_update' ? <ShieldCheck size={22} /> : notif.type === 'reminder' ? <BellRing size={22} /> : <Bell size={22} />}
+            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${notif.type === 'role_update' ? 'bg-emerald-50 text-emerald-600' : notif.type === 'role_request' ? 'bg-blue-50 text-blue-600' : notif.type === 'club_request' ? 'bg-purple-50 text-purple-600' : notif.type === 'club_update' ? 'bg-violet-50 text-violet-600' : notif.type === 'reminder' ? 'bg-rose-50 text-rose-600' : 'bg-indigo-50 text-indigo-600'}`}>
+              {notif.type === 'role_update' ? <ShieldCheck size={22} /> : notif.type === 'role_request' ? <Users size={22} /> : notif.type === 'club_request' ? <Users size={22} /> : notif.type === 'club_update' ? <CheckCircle2 size={22} /> : notif.type === 'reminder' ? <BellRing size={22} /> : <Bell size={22} />}
             </div>
             <div className="flex-1">
               <p className="text-sm font-black text-zinc-950 leading-tight mb-1">{notif.content}</p>
@@ -3768,7 +3768,7 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
   );
 };
 
-const SettingsView = ({ user, onLogout, onBack, setActiveTab }: { user: User, onLogout: () => void, onBack?: () => void, setActiveTab?: (t: string) => void }) => {
+const SettingsView = ({ user, onLogout, onBack, setActiveTab, onOpenClubRequest }: { user: User, onLogout: () => void, onBack?: () => void, setActiveTab?: (t: string) => void, onOpenClubRequest?: () => void }) => {
   const [modal, setModal] = useState<string | null>(null);
   const [language, setLanguage] = useState('English (US)');
   const [replyPolicy, setReplyPolicy] = useState<string>(localStorage.getItem('reply_policy') || 'Followers');
@@ -3786,7 +3786,9 @@ const SettingsView = ({ user, onLogout, onBack, setActiveTab }: { user: User, on
     { icon: UserPlus, label: 'Close Friends', key: 'close_friends', color: 'text-emerald-500', desc: 'Manage close friends list' },
     { icon: QrCode, label: 'Story, live and location', key: 'story_settings', color: 'text-rose-500', desc: 'Who can see your story' },
     { icon: MessageCircle, label: 'Messages and story replies', key: 'reply_settings', color: 'text-violet-600', desc: 'Control replies and DMs' },
-    { icon: Globe, label: 'Follow and invite friends', key: 'follow_invite', color: 'text-amber-700', desc: 'Invite people to Festora' }
+    { icon: Globe, label: 'Follow and invite friends', key: 'follow_invite', color: 'text-amber-700', desc: 'Invite people to Festora' },
+    ...(user.role === 'club_president' ? [{ icon: Plus, label: 'Request Club', key: 'request_club', color: 'text-indigo-700', desc: 'Create a new college club' }] : []),
+    ...(user.role === 'council_president' ? [{ icon: CheckCircle2, label: 'Club Requests', key: 'club_requests', color: 'text-emerald-700', desc: 'Review club requests' }] : [])
   ];
 
   const handleClick = async (key: string) => {
@@ -3796,6 +3798,8 @@ const SettingsView = ({ user, onLogout, onBack, setActiveTab }: { user: User, on
     if (key === 'account') return setModal('account');
     if (key === 'privacy') return setModal('privacy');
     if (key === 'language') return setModal('language');
+    if (key === 'request_club') return onOpenClubRequest?.();
+    if (key === 'club_requests') return setActiveTab?.('club-requests');
     if (key === 'close_friends') {
       // fetch suggestions to populate close friends list
       const res = await fetch(`/api/users/suggestions/${user.id}`);
@@ -4254,6 +4258,278 @@ const RegistrationModal = ({ isOpen, onClose, event, user, onConfirm }: { isOpen
   );
 };
 
+// Club Request Modal for Club Presidents
+const ClubRequestModal = ({ user, isOpen, onClose, onSubmit }: { user: User, isOpen: boolean, onClose: () => void, onSubmit: (data: any) => void }) => {
+  const [formData, setFormData] = useState({
+    club_name: '',
+    club_description: '',
+    related_to: '',
+    in_charge_name: '',
+    in_charge_email: ''
+  });
+  const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async () => {
+    if (!formData.club_name || !formData.club_description || !formData.in_charge_name) {
+      alert('Please fill all required fields');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/club-requests', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requester_id: user.id, ...formData })
+      });
+      if (res.ok) {
+        alert('Club request submitted! Waiting for council president approval.');
+        onSubmit(formData);
+        onClose();
+        setFormData({ club_name: '', club_description: '', related_to: '', in_charge_name: '', in_charge_email: '' });
+      } else {
+        alert('Failed to submit request');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error submitting request');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: '100%' }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: '100%' }}
+      className="fixed inset-0 bg-white z-[80] flex flex-col"
+    >
+      <header className="h-16 flex items-center px-6 border-b border-zinc-100 sticky top-0">
+        <button onClick={onClose} className="mr-4 text-zinc-400"><ChevronLeft size={28} /></button>
+        <h2 className="text-xl font-black tracking-tighter text-zinc-950">Create Club Request</h2>
+      </header>
+
+      <div className="flex-1 overflow-y-auto p-6 pb-24">
+        <div className="space-y-5 max-w-md">
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-2">Club Name *</label>
+            <input 
+              type="text"
+              className="input-field"
+              placeholder="e.g., Photography Club"
+              value={formData.club_name}
+              onChange={e => setFormData({ ...formData, club_name: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-2">Description *</label>
+            <textarea 
+              className="input-field"
+              placeholder="What is your club about?"
+              rows={4}
+              value={formData.club_description}
+              onChange={e => setFormData({ ...formData, club_description: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-2">Related To</label>
+            <input 
+              type="text"
+              className="input-field"
+              placeholder="e.g., Technical, Cultural, Sports"
+              value={formData.related_to}
+              onChange={e => setFormData({ ...formData, related_to: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-2">In Charge Name *</label>
+            <input 
+              type="text"
+              className="input-field"
+              placeholder="Primary contact person"
+              value={formData.in_charge_name}
+              onChange={e => setFormData({ ...formData, in_charge_name: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-2">In Charge Email</label>
+            <input 
+              type="email"
+              className="input-field"
+              placeholder="contact@example.com"
+              value={formData.in_charge_email}
+              onChange={e => setFormData({ ...formData, in_charge_email: e.target.value })}
+            />
+          </div>
+
+          <button 
+            onClick={handleSubmit}
+            disabled={isLoading}
+            className="btn-primary w-full mt-6"
+          >
+            {isLoading ? 'Submitting...' : 'Submit Request'}
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+// Club Requests Admin View (for Council President)
+const ClubRequestsView = ({ user, onBack }: { user: User, onBack?: () => void }) => {
+  const [requests, setRequests] = useState<any[]>([]);
+  const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const fetchClubRequests = () => {
+    if (user.college_name) {
+      fetch(`/api/club-requests?collegeCode=${user.college_name}&status=pending`)
+        .then(res => res.json())
+        .then(setRequests);
+    }
+  };
+
+  useEffect(() => {
+    fetchClubRequests();
+  }, [user.college_name]);
+
+  const handleApprove = async (requestId: number) => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/club-requests/${requestId}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reviewedBy: user.id })
+      });
+      if (res.ok) {
+        alert('Club approved and created!');
+        setSelectedRequest(null);
+        fetchClubRequests();
+      } else {
+        alert('Failed to approve request');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error approving request');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleReject = async (requestId: number) => {
+    const reason = prompt('Enter rejection reason (optional):');
+    if (reason === null) return;
+    
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/club-requests/${requestId}/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reviewedBy: user.id, reason })
+      });
+      if (res.ok) {
+        alert('Request rejected');
+        setSelectedRequest(null);
+        fetchClubRequests();
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (selectedRequest) {
+    return (
+      <div className="pb-24 pt-6 px-6 max-w-md mx-auto">
+        <button onClick={() => setSelectedRequest(null)} className="mb-6 flex items-center gap-2 text-indigo-600 font-black text-sm">
+          <ChevronLeft size={20} /> Back
+        </button>
+        
+        <div className="bg-indigo-50 rounded-3xl p-6 border border-indigo-100 mb-6">
+          <h3 className="text-2xl font-black text-zinc-950 mb-2">{selectedRequest.club_name}</h3>
+          <p className="text-sm text-zinc-600 mb-4">{selectedRequest.club_description}</p>
+          
+          <div className="space-y-3 text-sm mb-6">
+            <div>
+              <span className="font-black text-zinc-500 text-[10px]">REQUESTED BY</span>
+              <p className="font-black text-zinc-900">{selectedRequest.requester_name}</p>
+            </div>
+            <div>
+              <span className="font-black text-zinc-500 text-[10px]">IN CHARGE</span>
+              <p className="font-black text-zinc-900">{selectedRequest.in_charge_name}</p>
+              {selectedRequest.in_charge_email && <p className="text-[10px] text-zinc-500">{selectedRequest.in_charge_email}</p>}
+            </div>
+            {selectedRequest.related_to && (
+              <div>
+                <span className="font-black text-zinc-500 text-[10px]">RELATED TO</span>
+                <p className="font-black text-zinc-900">{selectedRequest.related_to}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-3">
+            <button 
+              onClick={() => handleApprove(selectedRequest.id)}
+              disabled={isLoading}
+              className="flex-1 bg-emerald-600 text-white font-black text-sm py-3 rounded-2xl hover:bg-emerald-700 transition-all"
+            >
+              Approve
+            </button>
+            <button 
+              onClick={() => handleReject(selectedRequest.id)}
+              disabled={isLoading}
+              className="flex-1 bg-rose-100 text-rose-600 font-black text-sm py-3 rounded-2xl hover:bg-rose-200 transition-all"
+            >
+              Reject
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="pb-24 pt-6 px-6 max-w-md mx-auto">
+      <div className="flex items-center gap-4 mb-6">
+        {onBack && (
+          <button onClick={onBack} className="p-2 bg-zinc-100 rounded-full hover:bg-zinc-200">
+            <ChevronLeft size={20} />
+          </button>
+        )}
+        <h2 className="text-3xl font-black tracking-tighter">Club Requests</h2>
+      </div>
+
+      <div className="space-y-3">
+        {requests.map(req => (
+          <div 
+            key={req.id}
+            onClick={() => setSelectedRequest(req)}
+            className="p-4 bg-white border border-zinc-100 rounded-2xl cursor-pointer hover:shadow-lg hover:border-indigo-200 transition-all"
+          >
+            <h4 className="font-black text-sm text-zinc-950 mb-1">{req.club_name}</h4>
+            <p className="text-[10px] text-zinc-500 mb-2 line-clamp-2">{req.club_description}</p>
+            <p className="text-[10px] font-black text-indigo-600">By {req.requester_name}</p>
+          </div>
+        ))}
+
+        {requests.length === 0 && (
+          <div className="py-20 text-center text-zinc-300">
+            <CheckCircle2 size={48} className="mx-auto mb-4 opacity-20" />
+            <p className="font-bold">No pending club requests</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [resetPasswordToken, setResetPasswordToken] = useState<string | null>(null);
@@ -4332,6 +4608,7 @@ export default function App() {
   const [profileClubs, setProfileClubs] = useState<any[]>([]); // clubs belonging to the profile being viewed
   const [previousTab, setPreviousTab] = useState<string>('home');
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
+  const [showClubRequestModal, setShowClubRequestModal] = useState(false);
 
   const fetchEvents = () => {
     const url = user?.college_name ? `/api/events?college_code=${encodeURIComponent(user.college_name)}` : '/api/events';
@@ -4617,10 +4894,12 @@ export default function App() {
               )}
             </div>
           )}
-          {activeTab === 'settings' && <SettingsView user={user} onLogout={() => setUser(null)} onBack={() => setActiveTab(previousTab)} setActiveTab={setActiveTab} />}
+          {activeTab === 'settings' && <SettingsView user={user} onLogout={() => setUser(null)} onBack={() => setActiveTab(previousTab)} setActiveTab={setActiveTab} onOpenClubRequest={() => setShowClubRequestModal(true)} />}
+          {activeTab === 'club-requests' && user.role === 'council_president' && <ClubRequestsView user={user} onBack={() => setActiveTab(previousTab)} />}
         </motion.div>
       </AnimatePresence>
 
+      <ClubRequestModal user={user} isOpen={showClubRequestModal} onClose={() => setShowClubRequestModal(false)} onSubmit={() => setActiveTab('profile')} />
       <Navbar activeTab={activeTab} setActiveTab={(t) => { setPreviousTab(activeTab); setActiveTab(t); if (t !== 'create') setEditingEvent(null); if (t !== 'profile') setViewingProfileId(null); if (t !== 'home' && t !== 'promotions') setViewingEvent(null); }} user={user} />
       
       <AnimatePresence>

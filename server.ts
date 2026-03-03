@@ -320,6 +320,26 @@ async function initializeDatabase() {
       )
     `);
 
+    await execute(`
+      CREATE TABLE IF NOT EXISTS club_requests (
+        id SERIAL PRIMARY KEY,
+        requester_id INTEGER,
+        club_name VARCHAR(255),
+        club_description TEXT,
+        club_image_url TEXT,
+        in_charge_name VARCHAR(255),
+        in_charge_email VARCHAR(255),
+        related_to TEXT,
+        college_code VARCHAR(50),
+        status VARCHAR(50) DEFAULT 'pending',
+        requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        reviewed_at TIMESTAMP,
+        reviewed_by INTEGER,
+        FOREIGN KEY(requester_id) REFERENCES users(id),
+        FOREIGN KEY(reviewed_by) REFERENCES users(id)
+      )
+    `);
+
     console.log('Database schema initialized successfully');
   } catch (err) {
     console.error('Database initialization error:', err);
@@ -751,6 +771,171 @@ app.get("/api/clubs/:id/members", async (req, res) => {
 app.get("/api/users/:id/clubs", async (req, res) => {
   const clubs = await query("SELECT c.* FROM clubs c JOIN club_members cm ON c.id = cm.club_id WHERE cm.user_id = $1", [req.params.id]);
   res.json(clubs);
+});
+
+// Club Request: Club President submits request to create a club
+app.post("/api/club-requests", async (req, res) => {
+  const { requester_id, club_name, club_description, club_image_url, in_charge_name, in_charge_email, related_to } = req.body;
+  try {
+    // Validate requester is club_president
+    const requester = await queryOne("SELECT role, college_name FROM users WHERE id = $1", [requester_id]);
+    if (!requester) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    if (requester.role !== 'club_president') {
+      return res.status(403).json({ error: "Only club presidents can request new clubs" });
+    }
+
+    // Insert club request
+    const result = await queryOne(
+      "INSERT INTO club_requests (requester_id, club_name, club_description, club_image_url, in_charge_name, in_charge_email, related_to, college_code, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id",
+      [requester_id, club_name, club_description, club_image_url, in_charge_name, in_charge_email, related_to, requester.college_name, 'pending']
+    );
+
+    // Notify council president
+    const councilPresidents = await query(
+      "SELECT id, email, full_name FROM users WHERE role = 'council_president' AND LOWER(college_name) = LOWER($1)",
+      [requester.college_name]
+    );
+
+    for (const cp of councilPresidents) {
+      await execute(
+        "INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)",
+        [cp.id, `New club request: ${club_name}`, 'club_request', `/club-requests/${result.id}`]
+      );
+
+      if (cp.email) {
+        try {
+          await emailTransporter.sendMail({
+            from: process.env.EMAIL_FROM,
+            to: cp.email,
+            subject: `New Club Request: ${club_name}`,
+            html: `<p>Hi ${cp.full_name},</p><p>A new club request has been submitted: <strong>${club_name}</strong>. Please review and approve or reject in Festora.</p>`
+          });
+        } catch (err) {
+          console.error('Email send failed:', err);
+        }
+      }
+    }
+
+    res.json({ id: result.id, message: "Club request submitted" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get club requests (for council president)
+app.get("/api/club-requests", async (req, res) => {
+  const { collegeCode, status } = req.query;
+  try {
+    let query_str = "SELECT cr.*, u.full_name as requester_name FROM club_requests cr JOIN users u ON cr.requester_id = u.id WHERE 1=1";
+    const params: any[] = [];
+
+    if (collegeCode) {
+      query_str += ` AND cr.college_code = $${params.length + 1}`;
+      params.push(collegeCode);
+    }
+    if (status) {
+      query_str += ` AND cr.status = $${params.length + 1}`;
+      params.push(status);
+    }
+
+    query_str += " ORDER BY cr.requested_at DESC";
+    const requests = await query(query_str, params);
+    res.json(requests);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get single club request
+app.get("/api/club-requests/:id", async (req, res) => {
+  const cr = await queryOne("SELECT cr.*, u.full_name as requester_name FROM club_requests cr JOIN users u ON cr.requester_id = u.id WHERE cr.id = $1", [req.params.id]);
+  if (cr) {
+    res.json(cr);
+  } else {
+    res.status(404).json({ error: "Request not found" });
+  }
+});
+
+// Approve club request
+app.post("/api/club-requests/:id/approve", async (req, res) => {
+  const { reviewedBy } = req.body;
+  const requestId = req.params.id;
+  try {
+    // Verify reviewer is council president
+    const reviewer = await queryOne("SELECT role FROM users WHERE id = $1", [reviewedBy]);
+    if (!reviewer || reviewer.role !== 'council_president') {
+      return res.status(403).json({ error: "Only council presidents can approve club requests" });
+    }
+
+    const cr = await queryOne("SELECT * FROM club_requests WHERE id = $1", [requestId]);
+    if (!cr) {
+      return res.status(404).json({ error: "Request not found" });
+    }
+
+    // Create the club
+    const club = await queryOne(
+      "INSERT INTO clubs (name, description, logo_url, president_id, created_by, college_code) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+      [cr.club_name, cr.club_description, cr.club_image_url, cr.requester_id, cr.requester_id, cr.college_code]
+    );
+
+    // Add president as club member with 'president' role
+    await execute(
+      "INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3)",
+      [club.id, cr.requester_id, 'president']
+    );
+
+    // Update request status
+    await execute(
+      "UPDATE club_requests SET status = 'approved', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = $1 WHERE id = $2",
+      [reviewedBy, requestId]
+    );
+
+    // Notify requester
+    const requester = await queryOne("SELECT full_name FROM users WHERE id = $1", [cr.requester_id]);
+    await execute(
+      "INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)",
+      [cr.requester_id, `Your club "${cr.club_name}" has been approved!`, 'club_update', `/club/${club.id}`]
+    );
+
+    res.json({ success: true, club_id: club.id, message: "Club created successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Reject club request
+app.post("/api/club-requests/:id/reject", async (req, res) => {
+  const { reviewedBy, reason } = req.body;
+  const requestId = req.params.id;
+  try {
+    // Verify reviewer is council president
+    const reviewer = await queryOne("SELECT role FROM users WHERE id = $1", [reviewedBy]);
+    if (!reviewer || reviewer.role !== 'council_president') {
+      return res.status(403).json({ error: "Only council presidents can reject club requests" });
+    }
+
+    const cr = await queryOne("SELECT requester_id, club_name FROM club_requests WHERE id = $1", [requestId]);
+    if (!cr) {
+      return res.status(404).json({ error: "Request not found" });
+    }
+
+    await execute(
+      "UPDATE club_requests SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = $1 WHERE id = $2",
+      [reviewedBy, requestId]
+    );
+
+    // Notify requester
+    await execute(
+      "INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)",
+      [cr.requester_id, `Your club request for "${cr.club_name}" was rejected${reason ? ': ' + reason : ''}`, 'club_update', `/dashboard`]
+    );
+
+    res.json({ success: true, message: "Club request rejected" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 app.get("/api/check-rollno", async (req, res) => {
