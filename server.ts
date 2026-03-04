@@ -1131,6 +1131,7 @@ app.get("/api/analytics/:userId", async (req, res) => {
 
 app.post("/api/events", async (req, res) => {
   const { title, description, image_url, date, location, category, created_by, privacy, college_code, club_id, pass, google_form_url } = req.body;
+  console.log('Event POST request received:', { title: !!title, description: !!description, date: !!date, location: !!location, google_form_url: !!google_form_url, created_by });
   try {
     if (!title || !description || !date || !location || !google_form_url) {
       console.warn('Missing required fields:', { title: !!title, description: !!description, date: !!date, location: !!location, google_form_url: !!google_form_url });
@@ -1176,7 +1177,7 @@ app.post("/api/events", async (req, res) => {
 
     res.json({ id: result.id, success: true });
   } catch (err) {
-    console.error('Error creating event:', err.message);
+    console.error('Error creating event:', err);
     res.status(500).json({ error: err.message || 'Failed to create event' });
   }
 });

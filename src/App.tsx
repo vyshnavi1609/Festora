@@ -1732,9 +1732,11 @@ const CreateEventView = ({ user, onCreated, editingEvent, onCancel }: { user: Us
     if (!formData.description.trim()) newErrors.description = 'Description is required';
     if (!formData.date) newErrors.date = 'Date is required';
     if (!formData.location.trim()) newErrors.location = 'Location is required';
-    if (!formData.google_form_url.trim()) newErrors.google_form_url = 'Google Form URL is required';
-
-    if (formData.google_form_url && !formData.google_form_url.startsWith('http')) {
+    
+    const googleFormUrl = formData.google_form_url.trim();
+    if (!googleFormUrl) {
+      newErrors.google_form_url = 'Google Form URL is required';
+    } else if (!googleFormUrl.startsWith('http')) {
       newErrors.google_form_url = 'Must be a valid URL starting with http';
     }
     
@@ -1788,21 +1790,29 @@ const CreateEventView = ({ user, onCreated, editingEvent, onCancel }: { user: Us
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (!validate()) {
+      console.log('Validation failed. Errors:', errors);
+      return;
+    }
 
     const method = editingEvent ? 'PUT' : 'POST';
     const url = editingEvent ? `/api/events/${editingEvent.id}` : '/api/events';
     
+    const payload = { ...formData, created_by: user.id };
+    console.log('Submitting event payload:', payload);
+    
     const res = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...formData, created_by: user.id })
+      body: JSON.stringify(payload)
     });
     
     if (res.ok) {
+      console.log('Event posted successfully');
       onCreated();
     } else {
-      const err = await res.json().catch(() => null);
+      const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+      console.error('Event submission error:', err);
       alert((err && err.error) || 'Failed to post event');
     }
   };
