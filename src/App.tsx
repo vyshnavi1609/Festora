@@ -1843,8 +1843,10 @@ const CreateEventView = ({ user, onCreated, editingEvent, onCancel }: { user: Us
 
         <div className="space-y-5">
           <div>
-            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">Event Title</label>
+            <label htmlFor="event-title" className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">Event Title</label>
             <input 
+              id="event-title"
+              name="event-title"
               type="text" 
               placeholder="What's happening?" 
               className={`input-field mt-1.5 ${errors.title ? 'border-red-500' : ''}`}
@@ -1855,8 +1857,10 @@ const CreateEventView = ({ user, onCreated, editingEvent, onCancel }: { user: Us
           </div>
           
           <div>
-            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">Description</label>
+            <label htmlFor="event-description" className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">Description</label>
             <textarea 
+              id="event-description"
+              name="event-description"
               placeholder="Tell us more..." 
               className={`input-field h-32 resize-none mt-1.5 py-4 ${errors.description ? 'border-red-500' : ''}`}
               value={formData.description}
@@ -1884,8 +1888,10 @@ const CreateEventView = ({ user, onCreated, editingEvent, onCancel }: { user: Us
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">Date</label>
+                <label htmlFor="event-date" className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">Date</label>
                 <input 
+                  id="event-date"
+                  name="event-date"
                   type="date" 
                   className={`input-field mt-1.5 ${errors.date ? 'border-red-500' : ''}`}
                   value={formData.date}
@@ -1894,8 +1900,10 @@ const CreateEventView = ({ user, onCreated, editingEvent, onCancel }: { user: Us
                 {errors.date && <p className="text-[10px] text-red-500 font-bold mt-1.5 ml-2">{errors.date}</p>}
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">Location</label>
+                <label htmlFor="event-location" className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">Location</label>
                 <input 
+                  id="event-location"
+                  name="event-location"
                   type="text" 
                   placeholder="Where?" 
                   className={`input-field mt-1.5 ${errors.location ? 'border-red-500' : ''}`}
@@ -1929,8 +1937,10 @@ const CreateEventView = ({ user, onCreated, editingEvent, onCancel }: { user: Us
 
           {formData.privacy === 'private' && (
             <div>
-              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">College Code</label>
+              <label htmlFor="event-college-code" className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">College Code</label>
               <input
+                id="event-college-code"
+                name="event-college-code"
                 type="text"
                 placeholder="College identifier"
                 className="input-field mt-1.5"
@@ -1941,8 +1951,10 @@ const CreateEventView = ({ user, onCreated, editingEvent, onCancel }: { user: Us
           )}
 
           <div>
-            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">Registration Pass (Optional)</label>
+            <label htmlFor="event-pass" className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">Registration Pass (Optional)</label>
             <input
+              id="event-pass"
+              name="event-pass"
               type="text"
               placeholder="Pass/ticket for entry"
               className="input-field mt-1.5"
