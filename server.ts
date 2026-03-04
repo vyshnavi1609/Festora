@@ -1805,14 +1805,19 @@ app.get("/api/follows/following/:userId", async (req, res) => {
 // Stories
 app.post("/api/stories", async (req, res) => {
   const { content_type, content, background_color, text_color, font_size, visibility, user_id } = req.body;
+  console.log('Story POST received:', { content_type, content: !!content, background_color, text_color, font_size, visibility, user_id });
+  
   // Get user_id from request body (frontend sends it explicitly)
   const userId = user_id || (req as any).user?.id || (req as any).session?.userId;
+  console.log('Resolved userId:', userId);
   
   if (!content_type || !content || !userId) {
+    console.warn('Missing required story fields:', { content_type, content: !!content, userId });
     return res.status(400).json({ error: "Content type, content, and user ID are required" });
   }
   
   const expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
+  console.log('Story expires at:', expires_at.toISOString());
   
   try {
     const result = await queryOne(`
@@ -1821,10 +1826,11 @@ app.post("/api/stories", async (req, res) => {
       RETURNING id
     `, [userId, content_type, content, background_color || '#000000', text_color || '#FFFFFF', font_size || 'medium', visibility || 'everyone', expires_at.toISOString()]);
     
+    console.log('Story created successfully:', result.id);
     res.json({ id: result.id, message: "Story created successfully" });
   } catch (e) {
     console.error('Story creation error:', e);
-    res.status(500).json({ error: "Failed to create story" });
+    res.status(500).json({ error: "Failed to create story: " + (e.message || 'Unknown error') });
   }
 });
 
