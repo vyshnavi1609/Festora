@@ -1495,6 +1495,69 @@ app.post("/api/role-requests/reject", async (req, res) => {
   }
 });
 
+// Admin direct promotion
+app.post("/api/admin/promote/:userId", async (req, res) => {
+  const { admin_id, requested_role } = req.body;
+  const targetUserId = req.params.userId;
+  
+  try {
+    // Verify requester is admin
+    const admin = await queryOne("SELECT role FROM users WHERE id = $1", [admin_id]);
+    if (!admin || admin.role !== 'admin') {
+      return res.status(403).json({ error: "Only admins can directly promote users" });
+    }
+
+    // Verify target user exists
+    const targetUser = await queryOne("SELECT id, role, email, full_name FROM users WHERE id = $1", [targetUserId]);
+    if (!targetUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    if (targetUser.role === 'admin') {
+      return res.status(400).json({ error: "Cannot change admin role" });
+    }
+
+    // Update user's role
+    await execute("UPDATE users SET role = $1 WHERE id = $2", [requested_role, targetUserId]);
+
+    // Create notification
+    await execute("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [
+      targetUserId,
+      `You have been promoted to ${requested_role.replace('_', ' ')} by an administrator`,
+      'role_update',
+      `/profile/${targetUserId}`
+    ]);
+
+    // Send email notification
+    if (targetUser.email) {
+      try {
+        const roleDisplay = requested_role === 'council_president' ? 'Council President' : requested_role.replace('_', ' ');
+        await emailTransporter.sendMail({
+          from: process.env.EMAIL_FROM,
+          to: targetUser.email,
+          subject: `You have been promoted to ${roleDisplay}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #6366f1;">Role Promotion</h2>
+              <p>Hi ${targetUser.full_name},</p>
+              <p>You have been promoted to <strong>${roleDisplay}</strong> by an administrator.</p>
+              <p>Log in to Festora to see your new privileges and manage your responsibilities.</p>
+              <p>Best regards,<br>Festora Team</p>
+            </div>
+          `
+        });
+      } catch (emailError) {
+        console.error('Failed to send promotion email:', emailError);
+      }
+    }
+
+    res.json({ success: true, message: `User promoted to ${requested_role}` });
+  } catch (err) {
+    console.error('Admin promotion error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Notifications
 app.get("/api/notifications/:userId", async (req, res) => {
   const notifications = await query("SELECT * FROM notifications WHERE user_id = $1 ORDER BY timestamp DESC LIMIT 20", [req.params.userId]);

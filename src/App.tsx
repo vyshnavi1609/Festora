@@ -2403,6 +2403,31 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
     }
   };
 
+  const promoteToCouncilPresident = async (targetId: number) => {
+    try {
+      const res = await fetch(`/api/admin/promote/${targetId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_id: user.id,
+          requested_role: 'council_president'
+        })
+      });
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(`status ${res.status} ${errText}`);
+      }
+      alert('User promoted to Council President!');
+      // Refresh profile view
+      if (targetUserId) {
+        onViewProfile(targetUserId);
+      }
+    } catch (err) {
+      console.error('failed to promote user', err);
+      alert('Unable to promote user');
+    }
+  };
+
   const handleSaveProfile = async () => {
     await fetch(`/api/users/${user.id}/profile`, {
       method: 'POST',
@@ -2678,6 +2703,14 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                   className="flex-1 bg-purple-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-purple-100 transition-all border border-purple-100 active:scale-95"
                 >
                   Request Role
+                </button>
+              )}
+              {user.role === 'admin' && targetUser?.role !== 'admin' && (
+                <button 
+                  onClick={() => promoteToCouncilPresident(targetUser.id)}
+                  className="flex-1 bg-indigo-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all border border-indigo-100 active:scale-95"
+                >
+                  Promote to Council President
                 </button>
               )}
             </>
