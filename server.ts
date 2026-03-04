@@ -59,6 +59,19 @@ async function initializeDatabase() {
         FOREIGN KEY(created_by) REFERENCES users(id)
       )
     `);
+    // insert some demo events if table empty (for fresh installs)
+    try {
+      const cntRow: any = await queryOne('SELECT COUNT(*) as cnt FROM events');
+      if (cntRow && Number(cntRow.cnt) === 0) {
+        console.log('seeding example events');
+        await execute(`INSERT INTO events (title, description, date, location, created_by, privacy, google_form_url) VALUES
+          ('Welcome Social', 'Join us for the welcome social!', '2026-04-01', 'Main Hall', 1, 'social', 'https://forms.gle/example1'),
+          ('Tech Workshop', 'Learn React basics with our workshop.', '2026-04-05', 'Lab 3', 1, 'social', 'https://forms.gle/example2')
+        `);
+      }
+    } catch (seedErr) {
+      console.error('event seed error', seedErr);
+    }
 
     await execute(`
       CREATE TABLE IF NOT EXISTS comments (
