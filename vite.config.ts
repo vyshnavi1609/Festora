@@ -83,6 +83,7 @@ export default defineConfig(({ mode }) => {
                 target_user_id: data.target_user_id,
                 target_name: mock.users.find(u=>u.id===data.target_user_id)?.full_name || 'unknown',
                 requested_role: data.requested_role,
+                description: data.description || null,
                 status: 'pending',
                 club_id: data.club_id || null,
                 club_name: data.club_name || null,
