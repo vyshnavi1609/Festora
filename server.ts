@@ -1295,6 +1295,12 @@ app.post("/api/role-requests", async (req, res) => {
     if (!requester_id || !target_user_id || !requested_role) {
       return res.status(400).json({ error: 'requester_id, target_user_id and requested_role are required' });
     }
+    
+    // council_president can only be promoted by admin, not through requests
+    if (requested_role === 'council_president') {
+      return res.status(400).json({ error: 'Council President roles can only be assigned by administrators' });
+    }
+    
     // club_id is required when requesting a club_president role so we know which club
     if (requested_role === 'club_president' && !club_id) {
       return res.status(400).json({ error: 'club_id is required when requesting a club president' });
@@ -1405,6 +1411,8 @@ app.post("/api/role-requests", async (req, res) => {
 
 app.get("/api/role-requests/:userId", async (req, res) => {
   try {
+    console.log('Fetching role requests for userId:', req.params.userId);
+    
     // ensure the table exists in case the database is fresh or migrations haven't run
     await execute(`
       CREATE TABLE IF NOT EXISTS role_requests (
@@ -1424,11 +1432,12 @@ app.get("/api/role-requests/:userId", async (req, res) => {
 
     const user = await queryOne("SELECT role FROM users WHERE id = $1", [req.params.userId]);
     if (!user) {
+      console.warn('User not found:', req.params.userId);
       return res.status(404).json({ error: "User not found" });
     }
 
     // Build the query safely without information_schema check
-    let requests;
+    let requests: any[] = [];
     if (['admin', 'council_president', 'club_president'].includes(user.role)) {
       requests = await query(
         `SELECT role_requests.*,
@@ -1455,11 +1464,12 @@ app.get("/api/role-requests/:userId", async (req, res) => {
       );
     }
     
+    console.log(`Found ${requests.length} role requests for user ${req.params.userId}`);
     res.json(requests);
   } catch (err) {
     console.error('Error fetching role requests:', err);
-    // send empty list to prevent frontend from crashing
-    res.status(500).json({ error: err.message || 'internal' });
+    // Return empty array to prevent frontend from crashing
+    res.json([]);
   }
 });
 
