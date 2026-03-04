@@ -2707,14 +2707,6 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                   </button>
                 </>
               )}
-              {targetUser?.role === 'council_president' && (
-                <button 
-                  onClick={() => sendRoleRequest(targetUser.id, 'council_president')}
-                  className="flex-1 bg-purple-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-purple-100 transition-all border border-purple-100 active:scale-95"
-                >
-                  Request Role
-                </button>
-              )}
               {user.role === 'admin' && targetUser?.role !== 'admin' && (
                 <button 
                   onClick={() => promoteToCouncilPresident(targetUser.id)}

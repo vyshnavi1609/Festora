@@ -1277,10 +1277,10 @@ app.get("/api/users/:id", async (req, res) => {
   }
 });
 
-// Hierarchical Role Promotion: admin -> council_president -> club_president -> club_member
+// Hierarchical Role Promotion: admin -> council_president, council_president -> club_president -> club_member
 const roleHierarchy = {
   'admin': ['council_president'],
-  'council_president': ['council_president', 'club_president'],
+  'council_president': ['club_president'],
   'club_president': ['club_member'],
   'club_member': [],
   'student': []
