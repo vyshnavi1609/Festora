@@ -1405,6 +1405,23 @@ app.post("/api/role-requests", async (req, res) => {
 
 app.get("/api/role-requests/:userId", async (req, res) => {
   try {
+    // ensure the table exists in case the database is fresh or migrations haven't run
+    await execute(`
+      CREATE TABLE IF NOT EXISTS role_requests (
+        id SERIAL PRIMARY KEY,
+        requester_id INTEGER,
+        target_user_id INTEGER,
+        requested_role VARCHAR(50),
+        description TEXT,
+        status VARCHAR(50) DEFAULT 'pending',
+        club_id INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(requester_id) REFERENCES users(id),
+        FOREIGN KEY(target_user_id) REFERENCES users(id),
+        FOREIGN KEY(club_id) REFERENCES clubs(id)
+      )
+    `);
+
     const user = await queryOne("SELECT role FROM users WHERE id = $1", [req.params.userId]);
     if (!user) {
       return res.status(404).json({ error: "User not found" });
@@ -1440,8 +1457,9 @@ app.get("/api/role-requests/:userId", async (req, res) => {
     
     res.json(requests);
   } catch (err) {
-    console.error('Error fetching role requests:', err.message);
-    res.status(500).json({ error: err.message });
+    console.error('Error fetching role requests:', err);
+    // send empty list to prevent frontend from crashing
+    res.status(500).json({ error: err.message || 'internal' });
   }
 });
 
