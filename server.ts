@@ -1235,13 +1235,15 @@ app.get("/api/users/search", async (req, res) => {
 app.get("/api/users", async (req, res) => {
   // Get requester id from query or header
   const requesterId = req.query.requester || req.headers['x-requester-id'];
-  if (!requesterId) {
-    return res.status(401).json({ error: "Authentication required" });
-  }
+  // Allow council_president and admin to access user lists
   try {
-    const requester = await queryOne("SELECT role FROM users WHERE id = $1", [requesterId]);
-    if (!requester || requester.role !== 'admin') {
-      return res.status(403).json({ error: "Admin access required" });
+    if (requesterId) {
+      const requester = await queryOne("SELECT role FROM users WHERE id = $1", [requesterId]);
+      if (!requester || !['admin', 'council_president'].includes(requester.role)) {
+        return res.status(403).json({ error: "Admin or Council President access required" });
+      }
+    } else {
+      return res.status(401).json({ error: "Authentication required" });
     }
     const users = await query("SELECT id, username, full_name, role FROM users", []);
     res.json(users);
@@ -1277,7 +1279,7 @@ app.get("/api/users/:id", async (req, res) => {
 // Hierarchical Role Promotion: admin -> council_president -> club_president -> club_member
 const roleHierarchy = {
   'admin': ['council_president'],
-  'council_president': ['club_president'],
+  'council_president': ['council_president', 'club_president'],
   'club_president': ['club_member'],
   'club_member': [],
   'student': []
@@ -1397,34 +1399,28 @@ app.get("/api/role-requests/:userId", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // determine whether club_id column exists so we can safely join clubs
-    const hasClubId = await queryOne("SELECT column_name FROM information_schema.columns WHERE table_name='role_requests' AND column_name='club_id'");
-    const joinClub = hasClubId ? `LEFT JOIN clubs ON role_requests.club_id = clubs.id` : '';
-    const selectClub = hasClubId ? `, clubs.name as club_name` : '';
-
+    // Build the query safely without information_schema check
     let requests;
     if (['admin', 'council_president', 'club_president'].includes(user.role)) {
       requests = await query(
-        `SELECT role_requests.* ${selectClub},
+        `SELECT role_requests.*,
                u1.full_name as requester_name,
                u2.full_name as target_name
          FROM role_requests
          JOIN users u1 ON role_requests.requester_id = u1.id
          JOIN users u2 ON role_requests.target_user_id = u2.id
-         ${joinClub}
          WHERE role_requests.target_user_id = $1 OR role_requests.requester_id = $1
          ORDER BY role_requests.created_at DESC`,
         [req.params.userId]
       );
     } else {
       requests = await query(
-        `SELECT role_requests.* ${selectClub},
+        `SELECT role_requests.*,
                u1.full_name as requester_name,
                u2.full_name as target_name
          FROM role_requests
          JOIN users u1 ON role_requests.requester_id = u1.id
          JOIN users u2 ON role_requests.target_user_id = u2.id
-         ${joinClub}
          WHERE role_requests.target_user_id = $1
          ORDER BY role_requests.created_at DESC`,
         [req.params.userId]
@@ -1433,6 +1429,7 @@ app.get("/api/role-requests/:userId", async (req, res) => {
     
     res.json(requests);
   } catch (err) {
+    console.error('Error fetching role requests:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
