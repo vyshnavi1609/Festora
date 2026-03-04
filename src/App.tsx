@@ -2349,14 +2349,14 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
 
       let body: any = { requester_id: user.id, target_user_id: targetId, requested_role: role, description };
 
-      // if the viewer is not an authority and is asking to become a club_member or club_president,
-      // assume they are requesting a role from a president by clicking on their profile.
+      // if the viewer is not an authority and is asking to become a club_member, club_president, or council_president,
+      // assume they are requesting a role from a president/council by clicking on their profile.
       // swap requester/target and include the clubId if we know it.
-      if ((role === 'club_member' || role === 'club_president') && ['student', 'club_member'].includes(user.role)) {
-        // the `targetId` passed here is actually the profile being viewed (president)
+      if ((role === 'club_member' || role === 'club_president' || role === 'council_president') && ['student', 'club_member'].includes(user.role)) {
+        // the `targetId` passed here is actually the profile being viewed (president/council)
         body.requester_id = targetId;
         body.target_user_id = user.id;
-        if (profileClubs.length > 0) {
+        if (role === 'club_president' && profileClubs.length > 0) {
           // take the first club for simplicity; presidents typically lead one club
           body.club_id = profileClubs[0].id;
         }
@@ -2671,6 +2671,14 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                     Request Role
                   </button>
                 </>
+              )}
+              {targetUser?.role === 'council_president' && user.role === 'student' && (
+                <button 
+                  onClick={() => sendRoleRequest(targetUser.id, 'council_president')}
+                  className="flex-1 bg-amber-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-100 transition-all border border-amber-100 active:scale-95"
+                >
+                  Request Role
+                </button>
               )}
               {user.role === 'admin' && targetUser?.role !== 'admin' && (
                 <button 
