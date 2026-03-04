@@ -860,7 +860,8 @@ const Stories = ({ user, onViewProfile, onSendMessage }: { user: User, onViewPro
           background_color: backgroundColor,
           text_color: textColor,
           font_size: fontSize,
-          visibility: storyVisibility
+          visibility: storyVisibility,
+          user_id: user.id
         })
       });
 
@@ -899,7 +900,11 @@ const Stories = ({ user, onViewProfile, onSendMessage }: { user: User, onViewPro
     const story = stories[storyIndex];
     
     // Mark as viewed
-    await fetch(`/api/stories/${story.id}/view`, { method: 'POST' });
+    await fetch(`/api/stories/${story.id}/view`, { 
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ viewer_id: user.id })
+    });
     
     // Update local state
     setStories(prev => prev.map((s, i) => 
@@ -951,7 +956,11 @@ const Stories = ({ user, onViewProfile, onSendMessage }: { user: User, onViewPro
   };
 
   const deleteStory = async (storyId: number) => {
-    await fetch(`/api/stories/${storyId}`, { method: 'DELETE' });
+    await fetch(`/api/stories/${storyId}`, { 
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: user.id })
+    });
     fetchStories();
     setSelectedStoryIndex(null);
   };

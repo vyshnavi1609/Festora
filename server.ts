@@ -1715,12 +1715,12 @@ app.get("/api/follows/following/:userId", async (req, res) => {
 
 // Stories
 app.post("/api/stories", async (req, res) => {
-  const { content_type, content, background_color, text_color, font_size, visibility } = req.body;
-  // Get user_id from session or request (fallback to 1 only for dev)
-  const userId = (req as any).user?.id || (req as any).session?.userId || 1;
+  const { content_type, content, background_color, text_color, font_size, visibility, user_id } = req.body;
+  // Get user_id from request body (frontend sends it explicitly)
+  const userId = user_id || (req as any).user?.id || (req as any).session?.userId;
   
-  if (!content_type || !content) {
-    return res.status(400).json({ error: "Content type and content are required" });
+  if (!content_type || !content || !userId) {
+    return res.status(400).json({ error: "Content type, content, and user ID are required" });
   }
   
   const expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
@@ -1782,7 +1782,8 @@ app.get("/api/stories", async (req, res) => {
 });
 
 app.post("/api/stories/:storyId/view", async (req, res) => {
-  const viewerId = (req as any).user?.id || 1;
+  const { viewer_id } = req.body;
+  const viewerId = viewer_id || (req as any).user?.id;
   
   try {
     // PostgreSQL doesn't have INSERT OR IGNORE, use INSERT ... ON CONFLICT
@@ -1798,7 +1799,8 @@ app.post("/api/stories/:storyId/view", async (req, res) => {
 });
 
 app.delete("/api/stories/:storyId", async (req, res) => {
-  const userId = (req as any).user?.id || 1;
+  const { user_id } = req.body;
+  const userId = user_id || (req as any).user?.id;
   
   const story = await queryOne("SELECT * FROM stories WHERE id = $1 AND user_id = $2", [req.params.storyId, userId]);
   if (!story) {
