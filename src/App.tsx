@@ -2328,7 +2328,14 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
       flip the ids and also supply the club_id.
     */
     try {
-      let body: any = { requester_id: user.id, target_user_id: targetId, requested_role: role };
+      // president-level requests should include a short explanation
+      let description = '';
+      if (role === 'club_president' || role === 'council_president') {
+        description = prompt('Please describe your plans if granted this role:') || '';
+        if (description === null) return; // cancelled
+      }
+
+      let body: any = { requester_id: user.id, target_user_id: targetId, requested_role: role, description };
 
       // if the viewer is not an authority and is asking to become a club_member or club_president,
       // assume they are requesting a role from a president by clicking on their profile.
@@ -2827,10 +2834,15 @@ const AdminDashboard = ({ user }: { user: User }) => {
 
   const handleRequestRole = async (targetId: number, role: Role) => {
     try {
+      let description = '';
+      if (role === 'club_president' || role === 'council_president') {
+        description = prompt('Please describe the plans for this role:') || '';
+        if (description === null) return;
+      }
       const res = await fetch('/api/role-requests', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requester_id: user.id, target_user_id: targetId, requested_role: role })
+        body: JSON.stringify({ requester_id: user.id, target_user_id: targetId, requested_role: role, description })
       });
       if (!res.ok) throw new Error(`status ${res.status}`);
     } catch (err) {
@@ -4561,6 +4573,9 @@ const RoleRequestsView = ({ user, onBack }: { user: User, onBack?: () => void })
         
         <div className="bg-blue-50 rounded-3xl p-6 border border-blue-100 mb-6">
           <h3 className="text-2xl font-black text-zinc-950 mb-2">{selectedRequest.requester_name}</h3>
+          {selectedRequest.description && (
+            <p className="text-sm italic text-zinc-600 mb-4">“{selectedRequest.description}”</p>
+          )}
           <p className="text-sm text-zinc-600 mb-4">Wants to become a <span className="font-black text-blue-600">Club President</span></p>
           
           <div className="flex gap-4 pt-4">

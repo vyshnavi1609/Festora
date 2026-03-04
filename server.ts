@@ -101,6 +101,7 @@ async function initializeDatabase() {
         requester_id INTEGER,
         target_user_id INTEGER,
         requested_role VARCHAR(50),
+        description TEXT,
         status VARCHAR(50) DEFAULT 'pending',
         club_id INTEGER,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -112,6 +113,7 @@ async function initializeDatabase() {
     // some deployments might have created the table before club_id was added
     await execute(`ALTER TABLE role_requests ADD COLUMN IF NOT EXISTS club_id INTEGER`);
     // ensure the foreign key exists as well; on older schemas it may be missing
+    await execute(`ALTER TABLE role_requests ADD COLUMN IF NOT EXISTS description TEXT`);
     await execute(`
       DO $$
       BEGIN
@@ -1287,11 +1289,15 @@ const roleHierarchy = {
 };
 
 app.post("/api/role-requests", async (req, res) => {
-  const { requester_id, target_user_id, requested_role, club_id } = req.body;
-  console.log('Role request POST body:', req.body);
+  const { requester_id, target_user_id, requested_role, club_id, description } = req.body;
+  console.log('Role request POST body:', { requester_id, target_user_id, requested_role, club_id, hasDescription: !!description });
   try {
     if (!requester_id || !target_user_id || !requested_role) {
       return res.status(400).json({ error: 'requester_id, target_user_id and requested_role are required' });
+    }
+    // club_id is required when requesting a club_president role so we know which club
+    if (requested_role === 'club_president' && !club_id) {
+      return res.status(400).json({ error: 'club_id is required when requesting a club president' });
     }
     // Validate requester exists and get their role
     const requester = await queryOne("SELECT role, college_name FROM users WHERE id = $1", [requester_id]);
@@ -1325,9 +1331,9 @@ app.post("/api/role-requests", async (req, res) => {
       }
     }
 
-    // Create role request
-    const result = await queryOne("INSERT INTO role_requests (requester_id, target_user_id, requested_role, club_id) VALUES ($1, $2, $3, $4) RETURNING id", [
-      requester_id, target_user_id, requested_role, club_id || null]);
+    // Create role request, storing description if provided
+    const result = await queryOne("INSERT INTO role_requests (requester_id, target_user_id, requested_role, club_id, description) VALUES ($1, $2, $3, $4, $5) RETURNING id", [
+      requester_id, target_user_id, requested_role, club_id || null, description || null]);
 
     // Determine who should approve this request and notify them.
     // For club_president promotions the approver is the council_president for the club's college.
