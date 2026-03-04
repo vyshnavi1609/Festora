@@ -1732,9 +1732,10 @@ const CreateEventView = ({ user, onCreated, editingEvent, onCancel }: { user: Us
     if (!formData.description.trim()) newErrors.description = 'Description is required';
     if (!formData.date) newErrors.date = 'Date is required';
     if (!formData.location.trim()) newErrors.location = 'Location is required';
+    if (!formData.google_form_url.trim()) newErrors.google_form_url = 'Google Form URL is required';
 
     if (formData.google_form_url && !formData.google_form_url.startsWith('http')) {
-      newErrors.google_form_url = 'Must be a valid URL';
+      newErrors.google_form_url = 'Must be a valid URL starting with http';
     }
     
     const selectedDate = new Date(formData.date);
@@ -1994,7 +1995,7 @@ const CreateEventView = ({ user, onCreated, editingEvent, onCancel }: { user: Us
             />
           </div>
           <div>
-            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">Google Form / Registration Link (Optional)</label>
+            <label className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-400 ml-1">Google Form / Registration Link *</label>
             <input
               type="text"
               placeholder="https://forms.gle/..."
@@ -2373,14 +2374,14 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
     try {
       let body: any = { requester_id: user.id, target_user_id: targetId, requested_role: role };
 
-      // if the viewer is not an authority and is asking to become a club_member, assume
-      // they are requesting membership from a president by clicking on the president's
-      // profile.  swap requester/target and include the clubId if we know it.
-      if (role === 'club_member' && ['student', 'club_member'].includes(user.role)) {
+      // if the viewer is not an authority and is asking to become a club_member or council_president,
+      // assume they are requesting a role from a president/council by clicking on their profile.
+      // swap requester/target and include the clubId if we know it.
+      if ((role === 'club_member' || role === 'council_president') && ['student', 'club_member'].includes(user.role)) {
         // the `targetId` passed here is actually the profile being viewed (president)
         body.requester_id = targetId;
         body.target_user_id = user.id;
-        if (profileClubs.length > 0) {
+        if (role === 'club_member' && profileClubs.length > 0) {
           // take the first club for simplicity; presidents typically lead one club
           body.club_id = profileClubs[0].id;
         }

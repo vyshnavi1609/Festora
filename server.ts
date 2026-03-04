@@ -1132,9 +1132,9 @@ app.get("/api/analytics/:userId", async (req, res) => {
 app.post("/api/events", async (req, res) => {
   const { title, description, image_url, date, location, category, created_by, privacy, college_code, club_id, pass, google_form_url } = req.body;
   try {
-    if (!title || !description || !date || !location) {
-      console.warn('Missing required fields:', { title: !!title, description: !!description, date: !!date, location: !!location });
-      return res.status(400).json({ error: "All fields are required" });
+    if (!title || !description || !date || !location || !google_form_url) {
+      console.warn('Missing required fields:', { title: !!title, description: !!description, date: !!date, location: !!location, google_form_url: !!google_form_url });
+      return res.status(400).json({ error: "Title, description, date, location, and Google Form URL are required" });
     }
     if (!created_by) {
       console.warn('Missing created_by field');
@@ -1150,8 +1150,8 @@ app.post("/api/events", async (req, res) => {
       return res.status(403).json({ error: "Students cannot create events" });
     }
     
-    if (google_form_url && !google_form_url.startsWith('http')) {
-      return res.status(400).json({ error: "Invalid Google Form URL" });
+    if (!google_form_url.startsWith('http')) {
+      return res.status(400).json({ error: "Google Form URL must start with http or https" });
     }
     const eventPrivacy = privacy === 'private' ? 'private' : 'social';
     const eventCollegeCode = eventPrivacy === 'private' ? (college_code || null) : null;
