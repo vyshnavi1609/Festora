@@ -2384,14 +2384,14 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
     try {
       let body: any = { requester_id: user.id, target_user_id: targetId, requested_role: role };
 
-      // if the viewer is not an authority and is asking to become a club_member or council_president,
-      // assume they are requesting a role from a president/council by clicking on their profile.
+      // if the viewer is not an authority and is asking to become a club_member or club_president,
+      // assume they are requesting a role from a president by clicking on their profile.
       // swap requester/target and include the clubId if we know it.
-      if ((role === 'club_member' || role === 'council_president') && ['student', 'club_member'].includes(user.role)) {
+      if ((role === 'club_member' || role === 'club_president') && ['student', 'club_member'].includes(user.role)) {
         // the `targetId` passed here is actually the profile being viewed (president)
         body.requester_id = targetId;
         body.target_user_id = user.id;
-        if (role === 'club_member' && profileClubs.length > 0) {
+        if (profileClubs.length > 0) {
           // take the first club for simplicity; presidents typically lead one club
           body.club_id = profileClubs[0].id;
         }

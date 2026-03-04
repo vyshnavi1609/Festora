@@ -1288,7 +1288,11 @@ const roleHierarchy = {
 
 app.post("/api/role-requests", async (req, res) => {
   const { requester_id, target_user_id, requested_role, club_id } = req.body;
+  console.log('Role request POST body:', req.body);
   try {
+    if (!requester_id || !target_user_id || !requested_role) {
+      return res.status(400).json({ error: 'requester_id, target_user_id and requested_role are required' });
+    }
     // Validate requester exists and get their role
     const requester = await queryOne("SELECT role, college_name FROM users WHERE id = $1", [requester_id]);
     if (!requester) {
