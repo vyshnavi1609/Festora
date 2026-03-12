@@ -1246,6 +1246,47 @@ app.put("/api/events/:id", async (req, res) => {
   }
 });
 
+app.delete("/api/events/:id", async (req, res) => {
+  const eventId = req.params.id;
+  const userId = req.body.user_id || (req as any).user?.id;
+  
+  try {
+    // Check authorization: can only delete if admin, council_president, or own event (if club_president/club_member)
+    const event = await queryOne("SELECT created_by FROM events WHERE id = $1", [eventId]);
+    if (!event) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+    
+    if (userId) {
+      const user = await queryOne("SELECT role FROM users WHERE id = $1", [userId]);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      // Allow: admin, council_president, or (club_president/club_member who created it)
+      const canDelete = user.role === 'admin' || user.role === 'council_president' || 
+                       (['club_president', 'club_member'].includes(user.role) && event.created_by === userId);
+      if (!canDelete) {
+        return res.status(403).json({ error: "You can only delete events you created" });
+      }
+    }
+    
+    // Delete all related data first
+    await execute("DELETE FROM registrations WHERE event_id = $1", [eventId]);
+    await execute("DELETE FROM comments WHERE event_id = $1", [eventId]);
+    await execute("DELETE FROM likes WHERE event_id = $1", [eventId]);
+    await execute("DELETE FROM bookmarks WHERE event_id = $1", [eventId]);
+    await execute("DELETE FROM event_reminders WHERE event_id = $1", [eventId]);
+    
+    // Delete the event
+    await execute("DELETE FROM events WHERE id = $1", [eventId]);
+    
+    res.json({ success: true, message: "Event deleted successfully" });
+  } catch (err) {
+    console.error('Error deleting event:', err.message);
+    res.status(500).json({ error: err.message || 'Failed to delete event' });
+  }
+});
+
 // Role Management
 app.get("/api/users/search", async (req, res) => {
   const searchQuery = req.query.q as string;

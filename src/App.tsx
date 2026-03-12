@@ -240,6 +240,7 @@ interface EventCardProps {
   isRegistered: boolean;
   isLiked: boolean;
   onLike: () => void;
+  onDelete?: (id: number) => void;
 }
 
 const EventDetailsModal = ({ isOpen, onClose, event, user, onRegister, onSave, onMessage, onEdit, onRefresh, onViewProfile, onShare }: { isOpen: boolean, onClose: () => void, event: Event, user: User, onRegister: (id: number) => void, onSave: (id: number) => void, onMessage: (id: number) => void, onEdit: (event: Event) => void, onRefresh: () => void, onViewProfile: (userId: number) => void, onShare: (event: Event) => void }) => {
@@ -412,7 +413,7 @@ const EventDetailsModal = ({ isOpen, onClose, event, user, onRegister, onSave, o
   );
 };
 
-const EventCard: React.FC<EventCardProps> = ({ event, user, onRegister, onUnregister, onSave, onMessage, onEdit, onRefresh, onViewProfile, onShare, onViewDetails, isRegistered, isLiked, onLike }) => {
+const EventCard: React.FC<EventCardProps> = ({ event, user, onRegister, onUnregister, onSave, onMessage, onEdit, onRefresh, onViewProfile, onShare, onViewDetails, isRegistered, isLiked, onLike, onDelete }) => {
   const [showComments, setShowComments] = useState(false);
   const [showQR, setShowQR] = useState(false);
   const [likeCount, setLikeCount] = useState(0);
@@ -499,9 +500,18 @@ const EventCard: React.FC<EventCardProps> = ({ event, user, onRegister, onUnregi
             <QrCode size={20} strokeWidth={2.5} />
           </button>
           {canEdit && (
-            <button onClick={() => onEdit(event)} className="p-3 text-zinc-400 hover:text-indigo-600 transition-all rounded-2xl hover:bg-indigo-50 active:scale-90">
-              <Edit3 size={20} strokeWidth={2.5} />
-            </button>
+            <>
+              <button onClick={() => onEdit(event)} className="p-3 text-zinc-400 hover:text-indigo-600 transition-all rounded-2xl hover:bg-indigo-50 active:scale-90">
+                <Edit3 size={20} strokeWidth={2.5} />
+              </button>
+              <button onClick={() => {
+                if (window.confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
+                  onDelete?.(event.id);
+                }
+              }} className="p-3 text-zinc-400 hover:text-red-600 transition-all rounded-2xl hover:bg-red-50 active:scale-90">
+                <Trash2 size={20} strokeWidth={2.5} />
+              </button>
+            </>
           )}
           <button className="p-3 text-zinc-400 hover:bg-zinc-50 rounded-2xl transition-all active:scale-90">
             <MoreHorizontal size={20} strokeWidth={2.5} />
@@ -1370,7 +1380,7 @@ const DiscoverView = ({ events, user, onViewDetails }: { events: Event[], user: 
   );
 };
 
-const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, onEdit, onRefresh, setActiveTab, unreadCount, onViewProfile, onViewDetails, onSendMessage, pendingRequests, suggestions, onFollowSuggestion }: { events: Event[], user: User, onRegister: (id: number) => void, onUnregister: (id: number) => void, onSave: (id: number) => void, onMessage: (id: number) => void, onEdit: (event: Event) => void, onRefresh: () => void, setActiveTab: (t: string) => void, unreadCount: number, onViewProfile: (userId: number) => void, onViewDetails: (event: Event) => void, onSendMessage?: (receiverId: number, content: string) => void, pendingRequests?: any[], suggestions?: User[], onFollowSuggestion?: (id: number) => void }) => {
+const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, onEdit, onRefresh, setActiveTab, unreadCount, onViewProfile, onViewDetails, onSendMessage, pendingRequests, suggestions, onFollowSuggestion, onDelete }: { events: Event[], user: User, onRegister: (id: number) => void, onUnregister: (id: number) => void, onSave: (id: number) => void, onMessage: (id: number) => void, onEdit: (event: Event) => void, onRefresh: () => void, setActiveTab: (t: string) => void, unreadCount: number, onViewProfile: (userId: number) => void, onViewDetails: (event: Event) => void, onSendMessage?: (receiverId: number, content: string) => void, pendingRequests?: any[], suggestions?: User[], onFollowSuggestion?: (id: number) => void, onDelete?: (id: number) => void }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [registeredEventIds, setRegisteredEventIds] = useState<number[]>([]);
   const [showCalendar, setShowCalendar] = useState(false);
@@ -1500,6 +1510,7 @@ const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, o
               isRegistered={registeredEventIds.includes(event.id)}
               isLiked={likedEventIds.includes(event.id)}
               onLike={fetchLikes}
+              onDelete={onDelete}
             />
           </div>
         ))}
@@ -4235,7 +4246,7 @@ const [deleteError, setDeleteError] = useState("");
   );
 };
 
-const EventDetailsView = ({ event, user, isRegistered, onRegister, onUnregister, onSave, onMessage, onEdit, onRefresh, onClose, onViewProfile, onShare }: { event: Event, user: User, isRegistered: boolean, onRegister: (id: number) => void, onUnregister: (id: number) => void, onSave: (id: number) => void, onMessage: (id: number) => void, onEdit: (event: Event) => void, onRefresh: () => void, onClose: () => void, onViewProfile: (userId: number) => void, onShare: (event: Event) => void }) => {
+const EventDetailsView = ({ event, user, isRegistered, onRegister, onUnregister, onSave, onMessage, onEdit, onRefresh, onClose, onViewProfile, onShare, onDelete }: { event: Event, user: User, isRegistered: boolean, onRegister: (id: number) => void, onUnregister: (id: number) => void, onSave: (id: number) => void, onMessage: (id: number) => void, onEdit: (event: Event) => void, onRefresh: () => void, onClose: () => void, onViewProfile: (userId: number) => void, onShare: (event: Event) => void, onDelete?: (id: number) => void }) => {
   const [showQR, setShowQR] = useState(false);
   const canEdit = user.role === 'admin' || user.role === 'council_president' || (['club_president', 'club_member'].includes(user.role) && event.created_by === user.id);
 
@@ -4283,9 +4294,21 @@ const EventDetailsView = ({ event, user, isRegistered, onRegister, onUnregister,
         <h2 className="text-sm font-black uppercase tracking-widest text-zinc-400">Event Details</h2>
         <div className="flex gap-2">
           {canEdit && (
-            <button onClick={() => { onEdit(event); onClose(); }} className="p-2 bg-zinc-100 rounded-full hover:bg-zinc-200 transition-colors">
-              <Edit3 size={20} />
-            </button>
+            <>
+              <button onClick={() => { onEdit(event); onClose(); }} className="p-2 bg-zinc-100 rounded-full hover:bg-zinc-200 transition-colors">
+                <Edit3 size={20} />
+              </button>
+              {onDelete && (
+                <button onClick={() => { 
+                  if (window.confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
+                    onDelete(event.id);
+                    onClose();
+                  }
+                }} className="p-2 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors">
+                  <Trash2 size={20} />
+                </button>
+              )}
+            </>
           )}
           <button onClick={() => onShare(event)} className="p-2 bg-zinc-100 rounded-full hover:bg-zinc-200 transition-colors">
             <Share2 size={20} />
@@ -5327,6 +5350,28 @@ export default function App() {
     setActiveTab('create');
   };
 
+  const handleDeleteEvent = async (eventId: number) => {
+    try {
+      const res = await fetch(`/api/events/${eventId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user?.id })
+      });
+      
+      if (res.ok) {
+        showToast('Event deleted successfully!');
+        fetchEvents();
+        setViewingEvent(null);
+      } else {
+        const err = await res.json().catch(() => ({ error: 'Unknown error' }));
+        showToast(err.error || 'Failed to delete event', 'error');
+      }
+    } catch (err) {
+      console.error('Delete event error:', err);
+      showToast('Failed to delete event', 'error');
+    }
+  };
+
   const handleFollowSuggestion = async (targetId: number) => {
     await fetch('/api/follows', {
       method: 'POST',
@@ -5403,6 +5448,7 @@ export default function App() {
               pendingRequests={user.role === 'council_president' ? clubRequests : undefined}
               suggestions={suggestions}
               onFollowSuggestion={handleFollowSuggestion}
+              onDelete={handleDeleteEvent}
             />
           )}
           {activeTab === 'discover' && (
@@ -5489,6 +5535,7 @@ export default function App() {
               navigator.clipboard.writeText(url);
               showToast('Link copied!');
             }}
+            onDelete={handleDeleteEvent}
           />
         )}
       </AnimatePresence>
