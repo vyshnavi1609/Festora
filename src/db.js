@@ -1,4 +1,10 @@
-import { Pool } from "pg";
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.pool = void 0;
+exports.query = query;
+exports.queryOne = queryOne;
+exports.execute = execute;
+const pg_1 = require("pg");
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
     console.warn('WARNING: DATABASE_URL not set. Set it in .env file.');
@@ -12,7 +18,7 @@ else {
         console.log('  Connecting to:', match[1]);
     }
 }
-export const pool = new Pool({
+exports.pool = new pg_1.Pool({
     connectionString,
     ssl: connectionString?.includes("render.com")
         ? { rejectUnauthorized: false }
@@ -22,9 +28,9 @@ export const pool = new Pool({
     connectionTimeoutMillis: 2000,
 });
 // Helper for querying (returns array)
-export async function query(text, params = []) {
+async function query(text, params = []) {
     try {
-        const result = await pool.query(text, params);
+        const result = await exports.pool.query(text, params);
         return result.rows;
     }
     catch (error) {
@@ -33,9 +39,9 @@ export async function query(text, params = []) {
     }
 }
 // Helper for single row
-export async function queryOne(text, params = []) {
+async function queryOne(text, params = []) {
     try {
-        const result = await pool.query(text, params);
+        const result = await exports.pool.query(text, params);
         return result.rows[0] || null;
     }
     catch (error) {
@@ -44,9 +50,9 @@ export async function queryOne(text, params = []) {
     }
 }
 // Helper for insert/update/delete (returns row count)
-export async function execute(text, params = []) {
+async function execute(text, params = []) {
     try {
-        const result = await pool.query(text, params);
+        const result = await exports.pool.query(text, params);
         return result.rowCount || 0;
     }
     catch (error) {
@@ -55,7 +61,7 @@ export async function execute(text, params = []) {
     }
 }
 // Test connection on startup
-pool.on("error", (err) => {
+exports.pool.on("error", (err) => {
     console.error("Unexpected error on idle client:", err);
 });
-export default pool;
+exports.default = exports.pool;

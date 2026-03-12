@@ -5124,6 +5124,7 @@ export default function App() {
       fetchLikes();
       fetchClubRequests();
       const interval = setInterval(() => {
+        fetchEvents();
         fetchNotifications();
         fetchRegistrations();
         fetchClubRequests();

@@ -1,21 +1,26 @@
-import dotenv from "dotenv";
-import path from "path";
-import { fileURLToPath } from "url";
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+const dotenv_1 = __importDefault(require("dotenv"));
+const path_1 = __importDefault(require("path"));
+const url_1 = require("url");
+const __filename = (0, url_1.fileURLToPath)(import.meta.url);
+const __dirname = path_1.default.dirname(__filename);
 // Load environment variables FIRST
-dotenv.config({ path: path.join(__dirname, '.env') });
-import express from "express";
-import fs from "fs";
-import nodemailer from "nodemailer";
-import crypto from "crypto";
-import { query, queryOne, execute } from "./src/db.js";
+dotenv_1.default.config({ path: path_1.default.join(__dirname, '.env') });
+const express_1 = __importDefault(require("express"));
+const fs_1 = __importDefault(require("fs"));
+const nodemailer_1 = __importDefault(require("nodemailer"));
+const crypto_1 = __importDefault(require("crypto"));
+const db_js_1 = require("./src/db.js");
 // Initialize Database
 // Initialize Database Schema
 async function initializeDatabase() {
     try {
         // Create tables with PostgreSQL syntax
-        await execute(`
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         username VARCHAR(255) UNIQUE,
@@ -32,7 +37,7 @@ async function initializeDatabase() {
         UNIQUE(college_name, roll_no)
       )
     `);
-        await execute(`
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS events (
         id SERIAL PRIMARY KEY,
         title VARCHAR(255),
@@ -53,7 +58,7 @@ async function initializeDatabase() {
         FOREIGN KEY(created_by) REFERENCES users(id)
       )
     `);
-        await execute(`
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS comments (
         id SERIAL PRIMARY KEY,
         event_id INTEGER,
@@ -64,7 +69,7 @@ async function initializeDatabase() {
         FOREIGN KEY(user_id) REFERENCES users(id)
       )
     `);
-        await execute(`
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS registrations (
         id SERIAL PRIMARY KEY,
         user_id INTEGER,
@@ -75,7 +80,7 @@ async function initializeDatabase() {
         FOREIGN KEY(event_id) REFERENCES events(id)
       )
     `);
-        await execute(`
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS waitlist (
         id SERIAL PRIMARY KEY,
         user_id INTEGER,
@@ -85,12 +90,13 @@ async function initializeDatabase() {
         FOREIGN KEY(event_id) REFERENCES events(id)
       )
     `);
-        await execute(`
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS role_requests (
         id SERIAL PRIMARY KEY,
         requester_id INTEGER,
         target_user_id INTEGER,
         requested_role VARCHAR(50),
+        description TEXT,
         status VARCHAR(50) DEFAULT 'pending',
         club_id INTEGER,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -99,7 +105,25 @@ async function initializeDatabase() {
         FOREIGN KEY(club_id) REFERENCES clubs(id)
       )
     `);
-        await execute(`
+        // some deployments might have created the table before club_id was added
+        await (0, db_js_1.execute)(`ALTER TABLE role_requests ADD COLUMN IF NOT EXISTS club_id INTEGER`);
+        // ensure the foreign key exists as well; on older schemas it may be missing
+        await (0, db_js_1.execute)(`ALTER TABLE role_requests ADD COLUMN IF NOT EXISTS description TEXT`);
+        await (0, db_js_1.execute)(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM information_schema.table_constraints
+          WHERE table_name='role_requests' AND constraint_type='FOREIGN KEY' AND constraint_name='role_requests_club_id_fkey'
+        ) THEN
+          ALTER TABLE role_requests
+            ADD CONSTRAINT role_requests_club_id_fkey
+            FOREIGN KEY (club_id) REFERENCES clubs(id);
+        END IF;
+      END
+      $$;
+    `);
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS messages (
         id SERIAL PRIMARY KEY,
         sender_id INTEGER,
@@ -110,7 +134,7 @@ async function initializeDatabase() {
         FOREIGN KEY(receiver_id) REFERENCES users(id)
       )
     `);
-        await execute(`
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS saved_events (
         id SERIAL PRIMARY KEY,
         user_id INTEGER,
@@ -119,19 +143,22 @@ async function initializeDatabase() {
         FOREIGN KEY(event_id) REFERENCES events(id)
       )
     `);
-        await execute(`
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS notifications (
         id SERIAL PRIMARY KEY,
         user_id INTEGER,
         content TEXT,
         type VARCHAR(50),
+        link TEXT,
         is_read INTEGER DEFAULT 0,
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         scheduled_at TIMESTAMP,
         FOREIGN KEY(user_id) REFERENCES users(id)
       )
     `);
-        await execute(`
+        // ensure link column exists on older databases
+        await (0, db_js_1.execute)(`ALTER TABLE notifications ADD COLUMN IF NOT EXISTS link TEXT`);
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS reminders (
         id SERIAL PRIMARY KEY,
         user_id INTEGER,
@@ -142,7 +169,7 @@ async function initializeDatabase() {
         FOREIGN KEY(event_id) REFERENCES events(id)
       )
     `);
-        await execute(`
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS follows (
         id SERIAL PRIMARY KEY,
         follower_id INTEGER,
@@ -153,7 +180,7 @@ async function initializeDatabase() {
         UNIQUE(follower_id, following_id)
       )
     `);
-        await execute(`
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS stories (
         id SERIAL PRIMARY KEY,
         user_id INTEGER,
@@ -162,12 +189,15 @@ async function initializeDatabase() {
         background_color VARCHAR(7) DEFAULT '#000000',
         text_color VARCHAR(7) DEFAULT '#FFFFFF',
         font_size VARCHAR(50) DEFAULT 'medium',
+        visibility VARCHAR(50) DEFAULT 'everyone',
         expires_at TIMESTAMP,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(user_id) REFERENCES users(id)
       )
     `);
-        await execute(`
+        // Add visibility column if it doesn't exist (for older databases)
+        await (0, db_js_1.execute)(`ALTER TABLE stories ADD COLUMN IF NOT EXISTS visibility VARCHAR(50) DEFAULT 'everyone'`);
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS story_views (
         id SERIAL PRIMARY KEY,
         story_id INTEGER,
@@ -178,7 +208,7 @@ async function initializeDatabase() {
         UNIQUE(story_id, viewer_id)
       )
     `);
-        await execute(`
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS likes (
         id SERIAL PRIMARY KEY,
         user_id INTEGER,
@@ -189,7 +219,7 @@ async function initializeDatabase() {
         UNIQUE(user_id, event_id)
       )
     `);
-        await execute(`
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS bookmarks (
         id SERIAL PRIMARY KEY,
         user_id INTEGER,
@@ -200,7 +230,7 @@ async function initializeDatabase() {
         UNIQUE(user_id, event_id)
       )
     `);
-        await execute(`
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS event_reminders (
         id SERIAL PRIMARY KEY,
         user_id INTEGER,
@@ -212,7 +242,7 @@ async function initializeDatabase() {
         FOREIGN KEY(event_id) REFERENCES events(id)
       )
     `);
-        await execute(`
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS activity (
         id SERIAL PRIMARY KEY,
         user_id INTEGER,
@@ -225,7 +255,7 @@ async function initializeDatabase() {
         FOREIGN KEY(target_event_id) REFERENCES events(id)
       )
     `);
-        await execute(`
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS password_reset_tokens (
         id SERIAL PRIMARY KEY,
         user_id INTEGER,
@@ -236,7 +266,7 @@ async function initializeDatabase() {
         FOREIGN KEY(user_id) REFERENCES users(id)
       )
     `);
-        await execute(`
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS clubs (
         id SERIAL PRIMARY KEY,
         name VARCHAR(255),
@@ -251,7 +281,7 @@ async function initializeDatabase() {
         FOREIGN KEY(created_by) REFERENCES users(id)
       )
     `);
-        await execute(`
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS club_members (
         id SERIAL PRIMARY KEY,
         club_id INTEGER,
@@ -263,7 +293,7 @@ async function initializeDatabase() {
         FOREIGN KEY(user_id) REFERENCES users(id)
       )
     `);
-        await execute(`
+        await (0, db_js_1.execute)(`
       CREATE TABLE IF NOT EXISTS club_follows (
         id SERIAL PRIMARY KEY,
         user_id INTEGER,
@@ -272,6 +302,25 @@ async function initializeDatabase() {
         FOREIGN KEY(user_id) REFERENCES users(id),
         FOREIGN KEY(club_id) REFERENCES clubs(id),
         UNIQUE(user_id, club_id)
+      )
+    `);
+        await (0, db_js_1.execute)(`
+      CREATE TABLE IF NOT EXISTS club_requests (
+        id SERIAL PRIMARY KEY,
+        requester_id INTEGER,
+        club_name VARCHAR(255),
+        club_description TEXT,
+        club_image_url TEXT,
+        in_charge_name VARCHAR(255),
+        in_charge_email VARCHAR(255),
+        related_to TEXT,
+        college_code VARCHAR(50),
+        status VARCHAR(50) DEFAULT 'pending',
+        requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        reviewed_at TIMESTAMP,
+        reviewed_by INTEGER,
+        FOREIGN KEY(requester_id) REFERENCES users(id),
+        FOREIGN KEY(reviewed_by) REFERENCES users(id)
       )
     `);
         console.log('Database schema initialized successfully');
@@ -287,7 +336,7 @@ initializeDatabase().catch(err => {
 // Cleanup expired stories periodically  
 setInterval(async () => {
     try {
-        const result = await execute("DELETE FROM stories WHERE expires_at <= NOW()");
+        const result = await (0, db_js_1.execute)("DELETE FROM stories WHERE expires_at <= NOW()");
         if (result > 0) {
             console.log(`Cleaned up ${result} expired stories`);
         }
@@ -297,12 +346,12 @@ setInterval(async () => {
     }
 }, 60 * 60 * 1000); // Run every hour
 // Express app initialization must come before all route definitions
-const app = express();
-app.use(express.json());
+const app = (0, express_1.default)();
+app.use(express_1.default.json());
 // temporary debug endpoint to verify database connectivity
 app.get("/debug/users", async (req, res) => {
     try {
-        const users = await query("SELECT * FROM users", []);
+        const users = await (0, db_js_1.query)("SELECT * FROM users", []);
         res.json(users);
     }
     catch (err) {
@@ -314,7 +363,7 @@ app.get("/debug/users", async (req, res) => {
 app.post("/api/club-follows", async (req, res) => {
     const { user_id, club_id } = req.body;
     try {
-        await execute("INSERT INTO club_follows (user_id, club_id) VALUES ($1, $2)", [user_id, club_id]);
+        await (0, db_js_1.execute)("INSERT INTO club_follows (user_id, club_id) VALUES ($1, $2)", [user_id, club_id]);
         res.json({ success: true });
     }
     catch (e) {
@@ -322,30 +371,30 @@ app.post("/api/club-follows", async (req, res) => {
     }
 });
 app.delete("/api/club-follows/:userId/:clubId", async (req, res) => {
-    await execute("DELETE FROM club_follows WHERE user_id = $1 AND club_id = $2", [req.params.userId, req.params.clubId]);
+    await (0, db_js_1.execute)("DELETE FROM club_follows WHERE user_id = $1 AND club_id = $2", [req.params.userId, req.params.clubId]);
     res.json({ success: true });
 });
 app.get("/api/club-follows/status/:userId/:clubId", async (req, res) => {
-    const follow = await queryOne("SELECT * FROM club_follows WHERE user_id = $1 AND club_id = $2", [req.params.userId, req.params.clubId]);
+    const follow = await (0, db_js_1.queryOne)("SELECT * FROM club_follows WHERE user_id = $1 AND club_id = $2", [req.params.userId, req.params.clubId]);
     res.json({ isFollowing: !!follow });
 });
 app.get("/api/club-follows/count/:clubId", async (req, res) => {
-    const count = await queryOne("SELECT COUNT(*) as count FROM club_follows WHERE club_id = $1", [req.params.clubId]);
+    const count = await (0, db_js_1.queryOne)("SELECT COUNT(*) as count FROM club_follows WHERE club_id = $1", [req.params.clubId]);
     res.json(count);
 });
 // Add qr_code column to events table if it doesn't exist
 // Postgres supports IF NOT EXISTS, so this will quietly skip existing column
 try {
-    await execute(`ALTER TABLE events ADD COLUMN IF NOT EXISTS qr_code TEXT`);
+    await (0, db_js_1.execute)(`ALTER TABLE events ADD COLUMN IF NOT EXISTS qr_code TEXT`);
 }
 catch (err) {
     // should never hit, but log anything unexpected
     console.error('Failed to add qr_code column:', err.message || err);
 }
 try {
-    const row = await queryOne("SELECT * FROM users WHERE role = 'admin'");
+    const row = await (0, db_js_1.queryOne)("SELECT * FROM users WHERE role = 'admin'");
     if (!row) {
-        await execute("INSERT INTO users (username, password, role, full_name) VALUES ($1, $2, $3, $4)", [
+        await (0, db_js_1.execute)("INSERT INTO users (username, password, role, full_name) VALUES ($1, $2, $3, $4)", [
             "admin", "admin123", "admin", "System Administrator"
         ]);
     }
@@ -354,7 +403,7 @@ catch (err) {
     console.error('Admin user setup error:', err);
 }
 // Email transporter
-const emailTransporter = nodemailer.createTransport({
+const emailTransporter = nodemailer_1.default.createTransport({
     host: process.env.EMAIL_HOST,
     port: parseInt(process.env.EMAIL_PORT || '587'),
     secure: false, // true for 465, false for other ports
@@ -372,12 +421,18 @@ emailTransporter.verify().then(() => {
 // Auth Routes (Simplified for demo)
 app.post("/api/login", async (req, res) => {
     const { identifier, password } = req.body;
-    // identifier can be username, email, or phone_number
-    const user = await queryOne(`
+    // Trim whitespace from inputs
+    const trimmedIdentifier = (identifier || '').trim();
+    const trimmedPassword = password || '';
+    if (!trimmedIdentifier || !trimmedPassword) {
+        return res.status(400).json({ error: "Username/Email/Phone and password are required" });
+    }
+    // identifier can be username, email, or phone_number - case-insensitive for email and username
+    const user = await (0, db_js_1.queryOne)(`
     SELECT * FROM users 
-    WHERE (username = $1 OR email = $1 OR phone_number = $1) 
+    WHERE (LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($1) OR phone_number = $1) 
     AND password = $2
-  `, [identifier, password]);
+  `, [trimmedIdentifier, trimmedPassword]);
     if (user) {
         res.json(user);
     }
@@ -387,30 +442,41 @@ app.post("/api/login", async (req, res) => {
 });
 app.post("/api/register", async (req, res) => {
     const { username, email, phone_number, password, full_name, avatar_url, college_name, roll_no } = req.body;
+    // Validate inputs
+    if (!username || !email || !phone_number || !password || !full_name || !college_name || !roll_no) {
+        return res.status(400).json({ error: "All fields are required" });
+    }
+    // Trim inputs
+    const trimmedUsername = username.trim();
+    const trimmedEmail = email.trim();
+    const trimmedPhone = phone_number.trim();
+    const trimmedCollege = college_name.trim();
+    const trimmedRollNo = roll_no.trim();
+    const trimmedFullName = full_name.trim();
     // Check if roll number already exists for this college
-    const existingRollNo = await queryOne("SELECT id FROM users WHERE college_name = $1 AND roll_no = $2", [college_name, roll_no]);
+    const existingRollNo = await (0, db_js_1.queryOne)("SELECT id FROM users WHERE LOWER(college_name) = LOWER($1) AND LOWER(roll_no) = LOWER($2)", [trimmedCollege, trimmedRollNo]);
     if (existingRollNo) {
         return res.status(400).json({ error: "A student with this roll number already exists in your college" });
     }
     try {
-        const result = await queryOne("INSERT INTO users (username, email, phone_number, password, full_name, avatar_url, college_name, roll_no, role) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id", [username, email, phone_number, password, full_name, avatar_url, college_name, roll_no, 'student']);
-        const user = await queryOne("SELECT * FROM users WHERE id = $1", [result.id]);
+        const result = await (0, db_js_1.queryOne)("INSERT INTO users (username, email, phone_number, password, full_name, avatar_url, college_name, roll_no, role) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id", [trimmedUsername, trimmedEmail, trimmedPhone, password, trimmedFullName, avatar_url, trimmedCollege, trimmedRollNo, 'student']);
+        const user = await (0, db_js_1.queryOne)("SELECT * FROM users WHERE id = $1", [result.id]);
         // Send welcome email
         const welcomeMailOptions = {
             from: `Festora <${process.env.EMAIL_FROM}>`,
-            to: email,
+            to: trimmedEmail,
             subject: 'Welcome to Festora - Registration Successful!',
             html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #6366f1;">Welcome to Festora, ${full_name}!</h2>
+          <h2 style="color: #6366f1;">Welcome to Festora, ${trimmedFullName}!</h2>
           <p>Congratulations! Your account has been successfully created.</p>
 
           <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <h3 style="margin-top: 0; color: #333;">Your Account Details:</h3>
-            <p><strong>Username:</strong> ${username}</p>
-            <p><strong>Email:</strong> ${email}</p>
-            <p><strong>College:</strong> ${college_name}</p>
-            <p><strong>Roll Number:</strong> ${roll_no}</p>
+            <p><strong>Username:</strong> ${trimmedUsername}</p>
+            <p><strong>Email:</strong> ${trimmedEmail}</p>
+            <p><strong>College:</strong> ${trimmedCollege}</p>
+            <p><strong>Roll Number:</strong> ${trimmedRollNo}</p>
           </div>
 
           <p>You can now:</p>
@@ -450,15 +516,15 @@ app.post("/api/register", async (req, res) => {
 });
 app.post("/api/forgot-password", async (req, res) => {
     const { email } = req.body;
-    const user = await queryOne("SELECT * FROM users WHERE email = $1", [email]);
+    const user = await (0, db_js_1.queryOne)("SELECT * FROM users WHERE email = $1", [email]);
     if (!user) {
         return res.status(404).json({ error: "No account found with this email address" });
     }
     // Generate reset token
-    const token = crypto.randomBytes(32).toString('hex');
+    const token = crypto_1.default.randomBytes(32).toString('hex');
     const expiresAt = new Date(Date.now() + 3600000); // 1 hour from now
     // Save token to database
-    await execute("INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)", [user.id, token, expiresAt.toISOString()]);
+    await (0, db_js_1.execute)("INSERT INTO password_reset_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)", [user.id, token, expiresAt.toISOString()]);
     // Send email
     // build reset url; fall back to request origin or localhost
     const baseUrl = process.env.APP_URL || req.headers.origin || `http://localhost:${process.env.PORT || 5173}`;
@@ -499,24 +565,39 @@ app.post("/api/forgot-password", async (req, res) => {
         res.json({ message: 'Reset link generated (email delivery failed)', resetUrl });
     }
 });
+// verify reset token and return account hint (email/username)
+app.get("/api/reset-password/verify", async (req, res) => {
+    const token = req.query.token;
+    if (!token)
+        return res.status(400).json({ error: "Token required" });
+    const resetToken = await (0, db_js_1.queryOne)("SELECT * FROM password_reset_tokens WHERE token = $1 AND expires_at > NOW() AND used = 0", [token]);
+    if (!resetToken) {
+        return res.status(400).json({ error: "Invalid or expired reset token" });
+    }
+    const user = await (0, db_js_1.queryOne)("SELECT id, email, username, full_name FROM users WHERE id = $1", [resetToken.user_id]);
+    if (!user) {
+        return res.status(500).json({ error: "User not found" });
+    }
+    res.json({ user: { email: user.email, username: user.username, full_name: user.full_name } });
+});
 app.post("/api/reset-password", async (req, res) => {
     const { token, newPassword } = req.body;
     // Find valid token
-    const resetToken = await queryOne("SELECT * FROM password_reset_tokens WHERE token = $1 AND expires_at > NOW() AND used = 0", [token]);
+    const resetToken = await (0, db_js_1.queryOne)("SELECT * FROM password_reset_tokens WHERE token = $1 AND expires_at > NOW() AND used = 0", [token]);
     if (!resetToken) {
         return res.status(400).json({ error: "Invalid or expired reset token" });
     }
     // Update password
-    await execute("UPDATE users SET password = $1 WHERE id = $2", [newPassword, resetToken.user_id]);
+    await (0, db_js_1.execute)("UPDATE users SET password = $1 WHERE id = $2", [newPassword, resetToken.user_id]);
     // Mark token as used
-    await execute("UPDATE password_reset_tokens SET used = 1 WHERE id = $1", [resetToken.id]);
+    await (0, db_js_1.execute)("UPDATE password_reset_tokens SET used = 1 WHERE id = $1", [resetToken.id]);
     res.json({ message: "Password reset successfully" });
 });
 // Club Management Routes
 app.post("/api/clubs", async (req, res) => {
     const { name, description, logo_url, president_id, user_id, college_code } = req.body;
     // Only council_president or admin can create clubs
-    const requester = await queryOne("SELECT role, college_name FROM users WHERE id = $1", [user_id]);
+    const requester = await (0, db_js_1.queryOne)("SELECT role, college_name FROM users WHERE id = $1", [user_id]);
     if (!requester || (requester.role !== 'council_president' && requester.role !== 'admin')) {
         return res.status(403).json({ error: "Only council president or admin can create clubs" });
     }
@@ -525,11 +606,11 @@ app.post("/api/clubs", async (req, res) => {
         return res.status(400).json({ error: "college_code is required" });
     }
     try {
-        const club = await queryOne("INSERT INTO clubs (name, description, logo_url, president_id, created_by, college_code) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id", [
+        const club = await (0, db_js_1.queryOne)("INSERT INTO clubs (name, description, logo_url, president_id, created_by, college_code) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id", [
             name, description, logo_url, president_id, user_id, college_code
         ]);
         // Add president as club member
-        await execute("INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3)", [club.id, president_id, 'president']);
+        await (0, db_js_1.execute)("INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3)", [club.id, president_id, 'president']);
         res.json({ message: "Club created successfully", club });
     }
     catch (error) {
@@ -540,11 +621,11 @@ app.get("/api/clubs", async (req, res) => {
     const { college_code } = req.query;
     try {
         if (college_code) {
-            const clubs = await query("SELECT * FROM clubs WHERE college_code = $1", [college_code]);
+            const clubs = await (0, db_js_1.query)("SELECT * FROM clubs WHERE college_code = $1", [college_code]);
             res.json(clubs);
         }
         else {
-            const clubs = await query("SELECT * FROM clubs", []);
+            const clubs = await (0, db_js_1.query)("SELECT * FROM clubs", []);
             res.json(clubs);
         }
     }
@@ -555,7 +636,7 @@ app.get("/api/clubs", async (req, res) => {
 // Get users eligible for promotion by current user
 app.get("/api/promotable-users/:userId", async (req, res) => {
     try {
-        const requester = await queryOne("SELECT role, college_name FROM users WHERE id = $1", [req.params.userId]);
+        const requester = await (0, db_js_1.queryOne)("SELECT role, college_name FROM users WHERE id = $1", [req.params.userId]);
         if (!requester) {
             return res.status(404).json({ error: "User not found" });
         }
@@ -571,7 +652,7 @@ app.get("/api/promotable-users/:userId", async (req, res) => {
             return res.json([]); // No one can be promoted beyond this role
         }
         // Get users who don't have this role yet and are from same college
-        const users = await query("SELECT id, full_name, email, role, college_name FROM users WHERE role != $1 AND college_name = $2 ORDER BY full_name", [nextRole, requester.college_name]);
+        const users = await (0, db_js_1.query)("SELECT id, full_name, email, role, college_name FROM users WHERE role != $1 AND college_name = $2 ORDER BY full_name", [nextRole, requester.college_name]);
         res.json(users);
     }
     catch (err) {
@@ -581,7 +662,7 @@ app.get("/api/promotable-users/:userId", async (req, res) => {
 // Get clubs for a specific college
 app.get("/api/clubs-by-college/:collegeCode", async (req, res) => {
     try {
-        const clubs = await query("SELECT id, name, description, logo_url FROM clubs WHERE college_code = $1", [req.params.collegeCode]);
+        const clubs = await (0, db_js_1.query)("SELECT id, name, description, logo_url FROM clubs WHERE college_code = $1", [req.params.collegeCode]);
         res.json(clubs);
     }
     catch (err) {
@@ -589,7 +670,7 @@ app.get("/api/clubs-by-college/:collegeCode", async (req, res) => {
     }
 });
 app.get("/api/clubs/:id", async (req, res) => {
-    const club = await queryOne("SELECT * FROM clubs WHERE id = $1", [req.params.id]);
+    const club = await (0, db_js_1.queryOne)("SELECT * FROM clubs WHERE id = $1", [req.params.id]);
     if (!club) {
         return res.status(404).json({ error: "Club not found" });
     }
@@ -599,12 +680,12 @@ app.post("/api/clubs/:id/members", async (req, res) => {
     const { user_id, member_id, role } = req.body;
     const clubId = req.params.id;
     // Check if requester is club president
-    const club = await queryOne("SELECT president_id FROM clubs WHERE id = $1", [clubId]);
+    const club = await (0, db_js_1.queryOne)("SELECT president_id FROM clubs WHERE id = $1", [clubId]);
     if (!club || club.president_id !== user_id) {
         return res.status(403).json({ error: "Only club president can add members" });
     }
     try {
-        await execute("INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3)", [
+        await (0, db_js_1.execute)("INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (club_id, user_id) DO UPDATE SET role = $3", [
             clubId, member_id, role || 'member'
         ]);
         res.json({ message: "Member added successfully" });
@@ -613,29 +694,196 @@ app.post("/api/clubs/:id/members", async (req, res) => {
         res.status(400).json({ error: error.message });
     }
 });
+// Update member role
+app.put("/api/clubs/:id/members/:memberId", async (req, res) => {
+    const { user_id, role } = req.body;
+    const clubId = req.params.id;
+    const memberId = req.params.memberId;
+    // Check if requester is club president
+    const club = await (0, db_js_1.queryOne)("SELECT president_id FROM clubs WHERE id = $1", [clubId]);
+    if (!club || club.president_id !== user_id) {
+        return res.status(403).json({ error: "Only club president can update members" });
+    }
+    try {
+        await (0, db_js_1.execute)("UPDATE club_members SET role = $1 WHERE club_id = $2 AND user_id = $3", [
+            role, clubId, memberId
+        ]);
+        res.json({ message: "Member role updated" });
+    }
+    catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+// Remove member
+app.delete("/api/clubs/:id/members/:memberId", async (req, res) => {
+    const clubId = req.params.id;
+    const memberId = req.params.memberId;
+    const { user_id } = req.query;
+    // Check if requester is club president
+    const club = await (0, db_js_1.queryOne)("SELECT president_id FROM clubs WHERE id = $1", [clubId]);
+    if (!club || club.president_id !== Number(user_id)) {
+        return res.status(403).json({ error: "Only club president can remove members" });
+    }
+    try {
+        await (0, db_js_1.execute)("DELETE FROM club_members WHERE club_id = $1 AND user_id = $2", [
+            clubId, memberId
+        ]);
+        res.json({ message: "Member removed" });
+    }
+    catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
 app.get("/api/clubs/:id/members", async (req, res) => {
-    const members = await query("SELECT u.id, u.username, u.full_name, u.avatar_url, cm.role FROM club_members cm JOIN users u ON cm.user_id = u.id WHERE cm.club_id = $1", [req.params.id]);
+    const members = await (0, db_js_1.query)("SELECT u.id, u.username, u.full_name, u.avatar_url, cm.role FROM club_members cm JOIN users u ON cm.user_id = u.id WHERE cm.club_id = $1", [req.params.id]);
     res.json(members);
 });
+// Get club follow count
+app.get("/api/clubs/:id/followers-count", async (req, res) => {
+    const result = await (0, db_js_1.queryOne)("SELECT COUNT(*) as count FROM club_follows WHERE club_id = $1", [req.params.id]);
+    res.json({ count: parseInt(result.count) });
+});
 app.get("/api/users/:id/clubs", async (req, res) => {
-    const clubs = await query("SELECT c.* FROM clubs c JOIN club_members cm ON c.id = cm.club_id WHERE cm.user_id = $1", [req.params.id]);
+    const clubs = await (0, db_js_1.query)("SELECT c.* FROM clubs c JOIN club_members cm ON c.id = cm.club_id WHERE cm.user_id = $1", [req.params.id]);
     res.json(clubs);
+});
+// Club Request: Club President submits request to create a club
+app.post("/api/club-requests", async (req, res) => {
+    const { requester_id, club_name, club_description, club_image_url, in_charge_name, in_charge_email, related_to } = req.body;
+    try {
+        // Validate requester is club_president
+        const requester = await (0, db_js_1.queryOne)("SELECT role, college_name FROM users WHERE id = $1", [requester_id]);
+        if (!requester) {
+            return res.status(404).json({ error: "User not found" });
+        }
+        if (requester.role !== 'club_president') {
+            return res.status(403).json({ error: "Only club presidents can request new clubs" });
+        }
+        // Insert club request
+        const result = await (0, db_js_1.queryOne)("INSERT INTO club_requests (requester_id, club_name, club_description, club_image_url, in_charge_name, in_charge_email, related_to, college_code, status) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id", [requester_id, club_name, club_description, club_image_url, in_charge_name, in_charge_email, related_to, requester.college_name, 'pending']);
+        // Notify council president
+        const councilPresidents = await (0, db_js_1.query)("SELECT id, email, full_name FROM users WHERE role = 'council_president' AND LOWER(college_name) = LOWER($1)", [requester.college_name]);
+        for (const cp of councilPresidents) {
+            await (0, db_js_1.execute)("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [cp.id, `New club request: ${club_name}`, 'club_request', `/club-requests/${result.id}`]);
+            if (cp.email) {
+                try {
+                    await emailTransporter.sendMail({
+                        from: process.env.EMAIL_FROM,
+                        to: cp.email,
+                        subject: `New Club Request: ${club_name}`,
+                        html: `<p>Hi ${cp.full_name},</p><p>A new club request has been submitted: <strong>${club_name}</strong>. Please review and approve or reject in Festora.</p>`
+                    });
+                }
+                catch (err) {
+                    console.error('Email send failed:', err);
+                }
+            }
+        }
+        res.json({ id: result.id, message: "Club request submitted" });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+// Get club requests (for council president)
+app.get("/api/club-requests", async (req, res) => {
+    const { collegeCode, status } = req.query;
+    try {
+        let query_str = "SELECT cr.*, u.full_name as requester_name FROM club_requests cr JOIN users u ON cr.requester_id = u.id WHERE 1=1";
+        const params = [];
+        if (collegeCode) {
+            query_str += ` AND cr.college_code = $${params.length + 1}`;
+            params.push(collegeCode);
+        }
+        if (status) {
+            query_str += ` AND cr.status = $${params.length + 1}`;
+            params.push(status);
+        }
+        query_str += " ORDER BY cr.requested_at DESC";
+        const requests = await (0, db_js_1.query)(query_str, params);
+        res.json(requests);
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+// Get single club request
+app.get("/api/club-requests/:id", async (req, res) => {
+    const cr = await (0, db_js_1.queryOne)("SELECT cr.*, u.full_name as requester_name FROM club_requests cr JOIN users u ON cr.requester_id = u.id WHERE cr.id = $1", [req.params.id]);
+    if (cr) {
+        res.json(cr);
+    }
+    else {
+        res.status(404).json({ error: "Request not found" });
+    }
+});
+// Approve club request
+app.post("/api/club-requests/:id/approve", async (req, res) => {
+    const { reviewedBy } = req.body;
+    const requestId = req.params.id;
+    try {
+        // Verify reviewer is council president
+        const reviewer = await (0, db_js_1.queryOne)("SELECT role FROM users WHERE id = $1", [reviewedBy]);
+        if (!reviewer || reviewer.role !== 'council_president') {
+            return res.status(403).json({ error: "Only council presidents can approve club requests" });
+        }
+        const cr = await (0, db_js_1.queryOne)("SELECT * FROM club_requests WHERE id = $1", [requestId]);
+        if (!cr) {
+            return res.status(404).json({ error: "Request not found" });
+        }
+        // Create the club
+        const club = await (0, db_js_1.queryOne)("INSERT INTO clubs (name, description, logo_url, president_id, created_by, college_code) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id", [cr.club_name, cr.club_description, cr.club_image_url, cr.requester_id, cr.requester_id, cr.college_code]);
+        // Add president as club member with 'president' role
+        await (0, db_js_1.execute)("INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3)", [club.id, cr.requester_id, 'president']);
+        // Update request status
+        await (0, db_js_1.execute)("UPDATE club_requests SET status = 'approved', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = $1 WHERE id = $2", [reviewedBy, requestId]);
+        // Notify requester
+        const requester = await (0, db_js_1.queryOne)("SELECT full_name FROM users WHERE id = $1", [cr.requester_id]);
+        await (0, db_js_1.execute)("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [cr.requester_id, `Your club "${cr.club_name}" has been approved!`, 'club_update', `/club/${club.id}`]);
+        res.json({ success: true, club_id: club.id, message: "Club created successfully" });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+// Reject club request
+app.post("/api/club-requests/:id/reject", async (req, res) => {
+    const { reviewedBy, reason } = req.body;
+    const requestId = req.params.id;
+    try {
+        // Verify reviewer is council president
+        const reviewer = await (0, db_js_1.queryOne)("SELECT role FROM users WHERE id = $1", [reviewedBy]);
+        if (!reviewer || reviewer.role !== 'council_president') {
+            return res.status(403).json({ error: "Only council presidents can reject club requests" });
+        }
+        const cr = await (0, db_js_1.queryOne)("SELECT requester_id, club_name FROM club_requests WHERE id = $1", [requestId]);
+        if (!cr) {
+            return res.status(404).json({ error: "Request not found" });
+        }
+        await (0, db_js_1.execute)("UPDATE club_requests SET status = 'rejected', reviewed_at = CURRENT_TIMESTAMP, reviewed_by = $1 WHERE id = $2", [reviewedBy, requestId]);
+        // Notify requester
+        await (0, db_js_1.execute)("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [cr.requester_id, `Your club request for "${cr.club_name}" was rejected${reason ? ': ' + reason : ''}`, 'club_update', `/dashboard`]);
+        res.json({ success: true, message: "Club request rejected" });
+    }
+    catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 app.get("/api/check-rollno", async (req, res) => {
     const { college, rollno } = req.query;
-    const existing = await queryOne("SELECT id FROM users WHERE college_name = $1 AND roll_no = $2", [college, rollno]);
+    const existing = await (0, db_js_1.queryOne)("SELECT id FROM users WHERE college_name = $1 AND roll_no = $2", [college, rollno]);
     res.json({ exists: !!existing });
 });
 app.post("/api/users/:id/profile", async (req, res) => {
     const { bio, social_links, avatar_url, college_name, roll_no } = req.body;
     // Check if roll number is already taken by another user in the same college
     if (college_name && roll_no) {
-        const existing = await queryOne("SELECT id FROM users WHERE college_name = $1 AND roll_no = $2 AND id != $3", [college_name, roll_no, req.params.id]);
+        const existing = await (0, db_js_1.queryOne)("SELECT id FROM users WHERE college_name = $1 AND roll_no = $2 AND id != $3", [college_name, roll_no, req.params.id]);
         if (existing) {
             return res.status(400).json({ error: "A student with this roll number already exists in your college" });
         }
     }
-    await execute("UPDATE users SET bio = $1, social_links = $2, avatar_url = $3, college_name = $4, roll_no = $5 WHERE id = $6", [
+    await (0, db_js_1.execute)("UPDATE users SET bio = $1, social_links = $2, avatar_url = $3, college_name = $4, roll_no = $5 WHERE id = $6", [
         bio,
         JSON.stringify(social_links),
         avatar_url,
@@ -647,7 +895,7 @@ app.post("/api/users/:id/profile", async (req, res) => {
 });
 // Event Routes
 app.get("/api/events/user/:id/count", async (req, res) => {
-    const count = await queryOne("SELECT COUNT(*) as count FROM events WHERE created_by = $1", [req.params.id]);
+    const count = await (0, db_js_1.queryOne)("SELECT COUNT(*) as count FROM events WHERE created_by = $1", [req.params.id]);
     res.json(count);
 });
 // Get events, filter private events by college code if provided
@@ -655,7 +903,7 @@ app.get("/api/events", async (req, res) => {
     const { college_code } = req.query;
     let events;
     if (college_code) {
-        events = await query(`
+        events = await (0, db_js_1.query)(`
       SELECT events.*, users.full_name as organizer_name,
       (SELECT COUNT(*) FROM registrations WHERE event_id = events.id) as registration_count,
       (SELECT COUNT(*) FROM comments WHERE event_id = events.id) as comment_count
@@ -666,7 +914,7 @@ app.get("/api/events", async (req, res) => {
     `, [college_code]);
     }
     else {
-        events = await query(`
+        events = await (0, db_js_1.query)(`
       SELECT events.*, users.full_name as organizer_name,
       (SELECT COUNT(*) FROM registrations WHERE event_id = events.id) as registration_count,
       (SELECT COUNT(*) FROM comments WHERE event_id = events.id) as comment_count
@@ -679,12 +927,12 @@ app.get("/api/events", async (req, res) => {
     res.json(events);
 });
 app.post("/api/events/:id/view", async (req, res) => {
-    await execute("UPDATE events SET views = views + 1 WHERE id = $1", [req.params.id]);
+    await (0, db_js_1.execute)("UPDATE events SET views = views + 1 WHERE id = $1", [req.params.id]);
     res.json({ success: true });
 });
 // Comment Routes
 app.get("/api/events/:eventId/comments", async (req, res) => {
-    const comments = await query(`
+    const comments = await (0, db_js_1.query)(`
     SELECT comments.*, users.username, users.full_name 
     FROM comments 
     JOIN users ON comments.user_id = users.id
@@ -695,21 +943,21 @@ app.get("/api/events/:eventId/comments", async (req, res) => {
 });
 app.post("/api/comments", async (req, res) => {
     const { event_id, user_id, content } = req.body;
-    await execute("INSERT INTO comments (event_id, user_id, content) VALUES ($1, $2, $3)", [
+    await (0, db_js_1.execute)("INSERT INTO comments (event_id, user_id, content) VALUES ($1, $2, $3)", [
         event_id, user_id, content
     ]);
     res.json({ success: true });
 });
 // Analytics
 app.get("/api/analytics/global", async (req, res) => {
-    const stats = await queryOne(`
+    const stats = await (0, db_js_1.queryOne)(`
     SELECT 
       (SELECT COUNT(*) FROM users) as total_users,
       (SELECT COUNT(*) FROM events) as total_events,
       (SELECT COUNT(*) FROM registrations) as total_registrations,
       (SELECT SUM(views) FROM events) as total_views
   `, []);
-    const recentActivity = await query(`
+    const recentActivity = await (0, db_js_1.query)(`
     SELECT 'registration' as type, u.full_name, e.title as target, r.timestamp
     FROM registrations r
     JOIN users u ON r.user_id = u.id
@@ -724,7 +972,7 @@ app.get("/api/analytics/global", async (req, res) => {
     res.json({ stats, recentActivity });
 });
 app.get("/api/analytics/:userId", async (req, res) => {
-    const stats = await queryOne(`
+    const stats = await (0, db_js_1.queryOne)(`
     SELECT 
       COUNT(e.id) as total_events,
       SUM(e.views) as total_views,
@@ -732,7 +980,7 @@ app.get("/api/analytics/:userId", async (req, res) => {
     FROM events e
     WHERE e.created_by = $2
   `, [req.params.userId, req.params.userId]);
-    const eventBreakdown = await query(`
+    const eventBreakdown = await (0, db_js_1.query)(`
     SELECT 
       title, 
       views, 
@@ -744,52 +992,115 @@ app.get("/api/analytics/:userId", async (req, res) => {
 });
 app.post("/api/events", async (req, res) => {
     const { title, description, image_url, date, location, category, created_by, privacy, college_code, club_id, pass, google_form_url } = req.body;
-    if (!title || !description || !date || !location) {
-        return res.status(400).json({ error: "All fields are required" });
+    console.log('Event POST request received:', { title: !!title, description: !!description, date: !!date, location: !!location, google_form_url: !!google_form_url, created_by });
+    try {
+        if (!title || !description || !date || !location || !google_form_url) {
+            console.warn('Missing required fields:', { title: !!title, description: !!description, date: !!date, location: !!location, google_form_url: !!google_form_url });
+            return res.status(400).json({ error: "Title, description, date, location, and Google Form URL are required" });
+        }
+        if (!created_by) {
+            console.warn('Missing created_by field');
+            return res.status(400).json({ error: "User ID is required" });
+        }
+        // Check if user is a student - students cannot create events
+        const user = await (0, db_js_1.queryOne)("SELECT role FROM users WHERE id = $1", [created_by]);
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+        if (user.role === 'student') {
+            return res.status(403).json({ error: "Students cannot create events" });
+        }
+        if (!google_form_url.startsWith('http')) {
+            return res.status(400).json({ error: "Google Form URL must start with http or https" });
+        }
+        const eventPrivacy = privacy === 'private' ? 'private' : 'social';
+        const eventCollegeCode = eventPrivacy === 'private' ? (college_code || null) : null;
+        const result = await (0, db_js_1.queryOne)("INSERT INTO events (title, description, image_url, date, location, category, created_by, privacy, college_code, club_id, pass, google_form_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id", [
+            title, description, image_url, date, location, category || 'Social', created_by, eventPrivacy, eventCollegeCode, club_id || null, pass || null, google_form_url || null
+        ]);
+        // if the event is for a club, notify its followers
+        if (club_id) {
+            const club = await (0, db_js_1.queryOne)("SELECT name FROM clubs WHERE id = $1", [club_id]);
+            const followers = await (0, db_js_1.query)("SELECT user_id FROM club_follows WHERE club_id = $1", [club_id]);
+            for (const f of followers) {
+                if (f.user_id === created_by)
+                    continue;
+                await (0, db_js_1.execute)("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [
+                    f.user_id,
+                    `New event posted by ${club?.name || 'your club'}`,
+                    'club_event',
+                    `/?event=${result.id}`
+                ]);
+            }
+        }
+        res.json({ id: result.id, success: true });
     }
-    if (google_form_url && !google_form_url.startsWith('http')) {
-        return res.status(400).json({ error: "Invalid Google Form URL" });
+    catch (err) {
+        console.error('Error creating event:', err);
+        res.status(500).json({ error: err.message || 'Failed to create event' });
     }
-    const eventPrivacy = privacy === 'private' ? 'private' : 'social';
-    const eventCollegeCode = eventPrivacy === 'private' ? (college_code || null) : null;
-    const result = await queryOne("INSERT INTO events (title, description, image_url, date, location, category, created_by, privacy, college_code, club_id, pass, google_form_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id", [
-        title, description, image_url, date, location, category || 'Social', created_by, eventPrivacy, eventCollegeCode, club_id || null, pass || null, google_form_url || null
-    ]);
-    res.json({ id: result.id });
 });
 app.put("/api/events/:id", async (req, res) => {
     const { title, description, image_url, date, location, category, privacy, college_code, pass, google_form_url } = req.body;
-    if (!title || !description || !date || !location) {
-        return res.status(400).json({ error: "All fields are required" });
+    const eventId = req.params.id;
+    const userId = req.body.created_by || req.user?.id;
+    try {
+        if (!title || !description || !date || !location) {
+            return res.status(400).json({ error: "All fields are required" });
+        }
+        if (google_form_url && !google_form_url.startsWith('http')) {
+            return res.status(400).json({ error: "Invalid Google Form URL" });
+        }
+        // Check authorization: can only edit if admin, council_president, or own event (if club_president/club_member)
+        const event = await (0, db_js_1.queryOne)("SELECT created_by FROM events WHERE id = $1", [eventId]);
+        if (!event) {
+            return res.status(404).json({ error: "Event not found" });
+        }
+        if (userId) {
+            const user = await (0, db_js_1.queryOne)("SELECT role FROM users WHERE id = $1", [userId]);
+            if (!user) {
+                return res.status(404).json({ error: "User not found" });
+            }
+            // Allow: admin, council_president, or (club_president/club_member who created it)
+            const canEdit = user.role === 'admin' || user.role === 'council_president' ||
+                (['club_president', 'club_member'].includes(user.role) && event.created_by === userId);
+            if (!canEdit) {
+                return res.status(403).json({ error: "You can only edit events you created" });
+            }
+        }
+        const eventPrivacy = privacy === 'private' ? 'private' : 'social';
+        const eventCollegeCode = eventPrivacy === 'private' ? (college_code || null) : null;
+        await (0, db_js_1.execute)("UPDATE events SET title = $1, description = $2, image_url = $3, date = $4, location = $5, category = $6, privacy = $7, college_code = $8, pass = $9, google_form_url = $10 WHERE id = $11", [
+            title, description, image_url, date, location, category, eventPrivacy, eventCollegeCode, pass || null, google_form_url || null, eventId
+        ]);
+        res.json({ success: true });
     }
-    if (google_form_url && !google_form_url.startsWith('http')) {
-        return res.status(400).json({ error: "Invalid Google Form URL" });
+    catch (err) {
+        console.error('Error updating event:', err.message);
+        res.status(500).json({ error: err.message || 'Failed to update event' });
     }
-    const eventPrivacy = privacy === 'private' ? 'private' : 'social';
-    const eventCollegeCode = eventPrivacy === 'private' ? (college_code || null) : null;
-    await execute("UPDATE events SET title = $1, description = $2, image_url = $3, date = $4, location = $5, category = $6, privacy = $7, college_code = $8, pass = $9, google_form_url = $10 WHERE id = $11", [
-        title, description, image_url, date, location, category, eventPrivacy, eventCollegeCode, pass || null, google_form_url || null, req.params.id
-    ]);
-    res.json({ success: true });
 });
 // Role Management
 app.get("/api/users/search", async (req, res) => {
     const searchQuery = req.query.q;
-    const users = await query("SELECT id, username, full_name, avatar_url FROM users WHERE username ILIKE $1 OR full_name ILIKE $2 LIMIT 10", [`%${searchQuery}%`, `%${searchQuery}%`]);
+    const users = await (0, db_js_1.query)("SELECT id, username, full_name, avatar_url FROM users WHERE username ILIKE $1 OR full_name ILIKE $2 LIMIT 10", [`%${searchQuery}%`, `%${searchQuery}%`]);
     res.json(users);
 });
 app.get("/api/users", async (req, res) => {
     // Get requester id from query or header
     const requesterId = req.query.requester || req.headers['x-requester-id'];
-    if (!requesterId) {
-        return res.status(401).json({ error: "Authentication required" });
-    }
+    // Allow council_president and admin to access user lists
     try {
-        const requester = await queryOne("SELECT role FROM users WHERE id = $1", [requesterId]);
-        if (!requester || requester.role !== 'admin') {
-            return res.status(403).json({ error: "Admin access required" });
+        if (requesterId) {
+            const requester = await (0, db_js_1.queryOne)("SELECT role FROM users WHERE id = $1", [requesterId]);
+            if (!requester || !['admin', 'council_president'].includes(requester.role)) {
+                return res.status(403).json({ error: "Admin or Council President access required" });
+            }
         }
-        const users = await query("SELECT id, username, full_name, role FROM users", []);
+        else {
+            return res.status(401).json({ error: "Authentication required" });
+        }
+        const users = await (0, db_js_1.query)("SELECT id, username, full_name, role FROM users", []);
         res.json(users);
     }
     catch (err) {
@@ -798,7 +1109,7 @@ app.get("/api/users", async (req, res) => {
 });
 app.get("/api/users/:id", async (req, res) => {
     try {
-        const user = await queryOne("SELECT id, username, full_name, role, bio, social_links, avatar_url, college_name, roll_no FROM users WHERE id = $1", [req.params.id]);
+        const user = await (0, db_js_1.queryOne)("SELECT id, username, full_name, role, bio, social_links, avatar_url, college_name, roll_no FROM users WHERE id = $1", [req.params.id]);
         if (!user) {
             return res.status(404).json({ error: "User not found" });
         }
@@ -808,7 +1119,7 @@ app.get("/api/users/:id", async (req, res) => {
             if (!requesterId) {
                 return res.status(403).json({ error: "Admin access required" });
             }
-            const requester = await queryOne("SELECT role FROM users WHERE id = $1", [requesterId]);
+            const requester = await (0, db_js_1.queryOne)("SELECT role FROM users WHERE id = $1", [requesterId]);
             if (!requester || requester.role !== 'admin') {
                 return res.status(403).json({ error: "Admin access required" });
             }
@@ -820,7 +1131,7 @@ app.get("/api/users/:id", async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
-// Hierarchical Role Promotion: admin -> council_president -> club_president -> club_member
+// Hierarchical Role Promotion: admin -> council_president, council_president -> club_president -> club_member
 const roleHierarchy = {
     'admin': ['council_president'],
     'council_president': ['club_president'],
@@ -829,15 +1140,23 @@ const roleHierarchy = {
     'student': []
 };
 app.post("/api/role-requests", async (req, res) => {
-    const { requester_id, target_user_id, requested_role, club_id } = req.body;
+    const { requester_id, target_user_id, requested_role, club_id, description } = req.body;
+    console.log('Role request POST body:', { requester_id, target_user_id, requested_role, club_id, hasDescription: !!description });
     try {
+        if (!requester_id || !target_user_id || !requested_role) {
+            return res.status(400).json({ error: 'requester_id, target_user_id and requested_role are required' });
+        }
+        // club_id is required when requesting a club_president role so we know which club
+        if (requested_role === 'club_president' && !club_id) {
+            return res.status(400).json({ error: 'club_id is required when requesting a club president' });
+        }
         // Validate requester exists and get their role
-        const requester = await queryOne("SELECT role, college_name FROM users WHERE id = $1", [requester_id]);
+        const requester = await (0, db_js_1.queryOne)("SELECT role, college_name FROM users WHERE id = $1", [requester_id]);
         if (!requester) {
             return res.status(404).json({ error: "Requester not found" });
         }
         // Validate target user exists
-        const targetUser = await queryOne("SELECT email, full_name, college_name FROM users WHERE id = $1", [target_user_id]);
+        const targetUser = await (0, db_js_1.queryOne)("SELECT email, full_name, college_name FROM users WHERE id = $1", [target_user_id]);
         if (!targetUser) {
             return res.status(404).json({ error: "Target user not found" });
         }
@@ -851,7 +1170,7 @@ app.post("/api/role-requests", async (req, res) => {
             if (!club_id) {
                 return res.status(400).json({ error: "club_id is required when promoting to club_president" });
             }
-            const club = await queryOne("SELECT college_code FROM clubs WHERE id = $1", [club_id]);
+            const club = await (0, db_js_1.queryOne)("SELECT college_code FROM clubs WHERE id = $1", [club_id]);
             if (!club) {
                 return res.status(404).json({ error: "Club not found" });
             }
@@ -859,11 +1178,51 @@ app.post("/api/role-requests", async (req, res) => {
                 return res.status(403).json({ error: "Can only promote to clubs in your college" });
             }
         }
-        // Create role request
-        const result = await queryOne("INSERT INTO role_requests (requester_id, target_user_id, requested_role, club_id) VALUES ($1, $2, $3, $4) RETURNING id", [
-            requester_id, target_user_id, requested_role, club_id || null
+        // Create role request, storing description if provided
+        const result = await (0, db_js_1.queryOne)("INSERT INTO role_requests (requester_id, target_user_id, requested_role, club_id, description) VALUES ($1, $2, $3, $4, $5) RETURNING id", [
+            requester_id, target_user_id, requested_role, club_id || null, description || null
         ]);
-        // Send email notification
+        // Determine who should approve this request and notify them.
+        // For club_president promotions the approver is the council_president for the club's college.
+        let approverIds = [];
+        if (requested_role === 'club_president' && club_id) {
+            const clubInfo = await (0, db_js_1.queryOne)("SELECT college_code FROM clubs WHERE id = $1", [club_id]);
+            if (clubInfo && clubInfo.college_code) {
+                const approvers = await (0, db_js_1.query)("SELECT id, email, full_name FROM users WHERE role = 'council_president' AND LOWER(college_name) = LOWER($1)", [clubInfo.college_code]);
+                approverIds = approvers.map((a) => a.id);
+                for (const ap of approvers) {
+                    await (0, db_js_1.execute)("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [
+                        ap.id,
+                        `Approval requested: promote ${targetUser.full_name} to club president for ${clubInfo.college_code}`,
+                        'role_request',
+                        `/role-requests/${result.id}`
+                    ]);
+                    if (ap.email) {
+                        try {
+                            await emailTransporter.sendMail({
+                                from: process.env.EMAIL_FROM,
+                                to: ap.email,
+                                subject: `Approval needed: Club President request for ${targetUser.full_name}`,
+                                html: `<p>Hi ${ap.full_name},</p><p>${requester.full_name} has requested that <strong>${targetUser.full_name}</strong> be made Club President for a club in your college (${clubInfo.college_code}). Please review and approve or reject the request in Festora.</p>`
+                            });
+                        }
+                        catch (emailError) {
+                            console.error('Failed to send approver email:', emailError);
+                        }
+                    }
+                }
+            }
+        }
+        else {
+            // For other promotions notify the requester (fallback) and the target user
+            await (0, db_js_1.execute)("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [
+                requester_id,
+                `New promotion request for ${requested_role.replace('_', ' ')}`,
+                'role_request',
+                `/profile/${target_user_id}`
+            ]);
+        }
+        // Notify target user that a request was created (so they can approve/reject if applicable)
         if (targetUser.email) {
             try {
                 const roleDetail = requested_role === 'club_president' ? 'Club President' : requested_role.replace('_', ' ');
@@ -875,8 +1234,8 @@ app.post("/api/role-requests", async (req, res) => {
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
               <h2 style="color: #6366f1;">Role Promotion Request</h2>
               <p>Hi ${targetUser.full_name},</p>
-              <p><strong>${requester.full_name}</strong> has sent you a promotion request for the role of <strong>${roleDetail}</strong>.</p>
-              <p>Please log in to your Festora account to approve or reject this request.</p>
+              <p><strong>${requester.full_name}</strong> has initiated a promotion request for the role of <strong>${roleDetail}</strong>.</p>
+              <p>Please log in to your Festora account to approve or see the status of this request.</p>
               <p>Best regards,<br>Festora Team</p>
             </div>
           `
@@ -886,7 +1245,7 @@ app.post("/api/role-requests", async (req, res) => {
                 console.error('Failed to send role request email:', emailError);
             }
         }
-        res.json({ id: result.id, message: "Promotion request sent" });
+        res.json({ id: result.id, message: "Promotion request sent", approverIds });
     }
     catch (err) {
         res.status(500).json({ error: err.message });
@@ -894,72 +1253,65 @@ app.post("/api/role-requests", async (req, res) => {
 });
 app.get("/api/role-requests/:userId", async (req, res) => {
     try {
-        const user = await queryOne("SELECT role FROM users WHERE id = $1", [req.params.userId]);
+        const user = await (0, db_js_1.queryOne)("SELECT role FROM users WHERE id = $1", [req.params.userId]);
         if (!user) {
             return res.status(404).json({ error: "User not found" });
         }
+        // Build the query safely without information_schema check
         let requests;
-        // Get requests where user is the target OR where user is a higher role (can see requests they created)
         if (['admin', 'council_president', 'club_president'].includes(user.role)) {
-            requests = await query(`
-        SELECT role_requests.*, 
-               u1.full_name as requester_name, 
-               u2.full_name as target_name,
-               clubs.name as club_name
-        FROM role_requests
-        JOIN users u1 ON role_requests.requester_id = u1.id
-        JOIN users u2 ON role_requests.target_user_id = u2.id
-        LEFT JOIN clubs ON role_requests.club_id = clubs.id
-        WHERE role_requests.target_user_id = $1 OR role_requests.requester_id = $1
-        ORDER BY role_requests.created_at DESC
-      `, [req.params.userId]);
+            requests = await (0, db_js_1.query)(`SELECT role_requests.*,
+               u1.full_name as requester_name,
+               u2.full_name as target_name
+         FROM role_requests
+         JOIN users u1 ON role_requests.requester_id = u1.id
+         JOIN users u2 ON role_requests.target_user_id = u2.id
+         WHERE role_requests.target_user_id = $1 OR role_requests.requester_id = $1
+         ORDER BY role_requests.created_at DESC`, [req.params.userId]);
         }
         else {
-            // Regular users only see requests sent to them
-            requests = await query(`
-        SELECT role_requests.*, 
-               u1.full_name as requester_name, 
-               u2.full_name as target_name,
-               clubs.name as club_name
-        FROM role_requests
-        JOIN users u1 ON role_requests.requester_id = u1.id
-        JOIN users u2 ON role_requests.target_user_id = u2.id
-        LEFT JOIN clubs ON role_requests.club_id = clubs.id
-        WHERE role_requests.target_user_id = $1
-        ORDER BY role_requests.created_at DESC
-      `, [req.params.userId]);
+            requests = await (0, db_js_1.query)(`SELECT role_requests.*,
+               u1.full_name as requester_name,
+               u2.full_name as target_name
+         FROM role_requests
+         JOIN users u1 ON role_requests.requester_id = u1.id
+         JOIN users u2 ON role_requests.target_user_id = u2.id
+         WHERE role_requests.target_user_id = $1
+         ORDER BY role_requests.created_at DESC`, [req.params.userId]);
         }
         res.json(requests);
     }
     catch (err) {
+        console.error('Error fetching role requests:', err.message);
         res.status(500).json({ error: err.message });
     }
 });
 app.post("/api/role-requests/approve", async (req, res) => {
     const { requestId } = req.body;
     try {
-        const request = await queryOne("SELECT * FROM role_requests WHERE id = $1", [requestId]);
+        const request = await (0, db_js_1.queryOne)("SELECT * FROM role_requests WHERE id = $1", [requestId]);
         if (!request) {
             return res.status(404).json({ error: "Request not found" });
         }
         // Update user role
-        await execute("UPDATE users SET role = $1 WHERE id = $2", [request.requested_role, request.target_user_id]);
+        await (0, db_js_1.execute)("UPDATE users SET role = $1 WHERE id = $2", [request.requested_role, request.target_user_id]);
         // If promoted to club_president, add as club president and club member
         if (request.requested_role === 'club_president' && request.club_id) {
-            await execute("UPDATE clubs SET president_id = $1 WHERE id = $2", [request.target_user_id, request.club_id]);
-            await execute("INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (club_id, user_id) DO UPDATE SET role = 'president'", [request.club_id, request.target_user_id, 'president']);
+            await (0, db_js_1.execute)("UPDATE clubs SET president_id = $1 WHERE id = $2", [request.target_user_id, request.club_id]);
+            await (0, db_js_1.execute)("INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (club_id, user_id) DO UPDATE SET role = 'president'", [request.club_id, request.target_user_id, 'president']);
         }
         // If promoted to club_member, add to the club
         if (request.requested_role === 'club_member' && request.club_id) {
-            await execute("INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (club_id, user_id) DO UPDATE SET role = 'member'", [request.club_id, request.target_user_id, 'member']);
+            await (0, db_js_1.execute)("INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (club_id, user_id) DO UPDATE SET role = 'member'", [request.club_id, request.target_user_id, 'member']);
         }
-        await execute("UPDATE role_requests SET status = 'approved' WHERE id = $1", [requestId]);
+        await (0, db_js_1.execute)("UPDATE role_requests SET status = 'approved' WHERE id = $1", [requestId]);
         // Create notification
         const roleDisplay = request.requested_role.replace('_', ' ');
-        await execute("INSERT INTO notifications (user_id, content, type) VALUES ($1, $2, $3)", [
+        await (0, db_js_1.execute)("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [
             request.target_user_id,
             `Your promotion to ${roleDisplay} has been approved!`,
-            'role_update'
+            'role_update',
+            `/profile/${request.target_user_id}`
         ]);
         res.json({ success: true, message: `User promoted to ${roleDisplay}` });
     }
@@ -969,11 +1321,11 @@ app.post("/api/role-requests/approve", async (req, res) => {
 });
 app.post("/api/role-requests/reject", async (req, res) => {
     const { requestId } = req.body;
-    const request = await queryOne("SELECT * FROM role_requests WHERE id = $1", [requestId]);
+    const request = await (0, db_js_1.queryOne)("SELECT * FROM role_requests WHERE id = $1", [requestId]);
     if (request) {
-        await execute("UPDATE role_requests SET status = 'rejected' WHERE id = $1", [requestId]);
+        await (0, db_js_1.execute)("UPDATE role_requests SET status = 'rejected' WHERE id = $1", [requestId]);
         // Create notification
-        await execute("INSERT INTO notifications (user_id, content, type) VALUES ($1, $2, $3)", [
+        await (0, db_js_1.execute)("INSERT INTO notifications (user_id, content, type) VALUES ($1, $2, $3)", [
             request.target_user_id,
             `Your request for ${request.requested_role.replace('_', ' ')} has been rejected.`,
             'role_update'
@@ -984,13 +1336,78 @@ app.post("/api/role-requests/reject", async (req, res) => {
         res.status(404).json({ error: "Request not found" });
     }
 });
+// Admin direct promotion
+app.post("/api/admin/promote/:userId", async (req, res) => {
+    const { admin_id, requested_role } = req.body;
+    const targetUserId = req.params.userId;
+    try {
+        // Verify requester is admin
+        const admin = await (0, db_js_1.queryOne)("SELECT role FROM users WHERE id = $1", [admin_id]);
+        if (!admin || admin.role !== 'admin') {
+            return res.status(403).json({ error: "Only admins can directly promote users" });
+        }
+        // Verify target user exists
+        const targetUser = await (0, db_js_1.queryOne)("SELECT id, role, email, full_name FROM users WHERE id = $1", [targetUserId]);
+        if (!targetUser) {
+            return res.status(404).json({ error: "User not found" });
+        }
+        if (targetUser.role === 'admin') {
+            return res.status(400).json({ error: "Cannot change admin role" });
+        }
+        // Update user's role
+        await (0, db_js_1.execute)("UPDATE users SET role = $1 WHERE id = $2", [requested_role, targetUserId]);
+        // Create notification
+        await (0, db_js_1.execute)("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [
+            targetUserId,
+            `You have been promoted to ${requested_role.replace('_', ' ')} by an administrator`,
+            'role_update',
+            `/profile/${targetUserId}`
+        ]);
+        // Send email notification
+        if (targetUser.email) {
+            try {
+                const roleDisplay = requested_role === 'council_president' ? 'Council President' : requested_role.replace('_', ' ');
+                await emailTransporter.sendMail({
+                    from: process.env.EMAIL_FROM,
+                    to: targetUser.email,
+                    subject: `You have been promoted to ${roleDisplay}`,
+                    html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #6366f1;">Role Promotion</h2>
+              <p>Hi ${targetUser.full_name},</p>
+              <p>You have been promoted to <strong>${roleDisplay}</strong> by an administrator.</p>
+              <p>Log in to Festora to see your new privileges and manage your responsibilities.</p>
+              <p>Best regards,<br>Festora Team</p>
+            </div>
+          `
+                });
+            }
+            catch (emailError) {
+                console.error('Failed to send promotion email:', emailError);
+            }
+        }
+        res.json({ success: true, message: `User promoted to ${requested_role}` });
+    }
+    catch (err) {
+        console.error('Admin promotion error:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
 // Notifications
 app.get("/api/notifications/:userId", async (req, res) => {
-    const notifications = await query("SELECT * FROM notifications WHERE user_id = $1 ORDER BY timestamp DESC LIMIT 20", [req.params.userId]);
+    const notifications = await (0, db_js_1.query)("SELECT * FROM notifications WHERE user_id = $1 ORDER BY timestamp DESC LIMIT 20", [req.params.userId]);
     res.json(notifications);
 });
+// helper to fetch a single event (used for deep-linking)
+app.get("/api/events/:id", async (req, res) => {
+    const event = await (0, db_js_1.queryOne)("SELECT * FROM events WHERE id = $1", [req.params.id]);
+    if (event)
+        res.json(event);
+    else
+        res.status(404).json({ error: "Event not found" });
+});
 app.post("/api/notifications/:id/read", async (req, res) => {
-    await execute("UPDATE notifications SET is_read = 1 WHERE id = $1", [req.params.id]);
+    await (0, db_js_1.execute)("UPDATE notifications SET is_read = 1 WHERE id = $1", [req.params.id]);
     res.json({ success: true });
 });
 // Messaging
@@ -998,7 +1415,7 @@ app.get("/api/messages/contacts/:userId", async (req, res) => {
     // Contacts are people you follow AND who follow you (mutuals) or just people you follow?
     // Instagram allows messaging anyone you follow, or mutuals. Let's go with mutuals or following for simplicity.
     // User request: "messages can only be for followers and following"
-    const contacts = await query(`
+    const contacts = await (0, db_js_1.query)(`
     SELECT DISTINCT u.id, u.username, u.full_name, u.role
     FROM users u
     WHERE u.id IN (
@@ -1010,7 +1427,7 @@ app.get("/api/messages/contacts/:userId", async (req, res) => {
     res.json(contacts);
 });
 app.get("/api/messages/:userId/:otherId", async (req, res) => {
-    const messages = await query(`
+    const messages = await (0, db_js_1.query)(`
     SELECT * FROM messages 
     WHERE (sender_id = $1 AND receiver_id = $2) 
     OR (sender_id = $3 AND receiver_id = $4)
@@ -1020,7 +1437,7 @@ app.get("/api/messages/:userId/:otherId", async (req, res) => {
 });
 app.post("/api/messages", async (req, res) => {
     const { sender_id, receiver_id, content } = req.body;
-    await execute("INSERT INTO messages (sender_id, receiver_id, content) VALUES ($1, $2, $3)", [
+    await (0, db_js_1.execute)("INSERT INTO messages (sender_id, receiver_id, content) VALUES ($1, $2, $3)", [
         sender_id, receiver_id, content
     ]);
     res.json({ success: true });
@@ -1029,7 +1446,7 @@ app.post("/api/messages", async (req, res) => {
 app.post("/api/register-event", async (req, res) => {
     const { user_id, event_id } = req.body;
     // Get event details
-    const event = await queryOne("SELECT google_form_url, title FROM events WHERE id = $1", [event_id]);
+    const event = await (0, db_js_1.queryOne)("SELECT google_form_url, title FROM events WHERE id = $1", [event_id]);
     if (!event) {
         return res.status(404).json({ error: "Event not found" });
     }
@@ -1043,21 +1460,21 @@ app.post("/api/register-event", async (req, res) => {
     }
     // Fallback: Internal registration (for events without Google Form)
     // Check if user is already registered or waitlisted
-    const existingReg = await queryOne("SELECT * FROM registrations WHERE user_id = $1 AND event_id = $2 AND status IN ('registered', 'waitlisted')", [user_id, event_id]);
+    const existingReg = await (0, db_js_1.queryOne)("SELECT * FROM registrations WHERE user_id = $1 AND event_id = $2 AND status IN ('registered', 'waitlisted')", [user_id, event_id]);
     if (existingReg) {
         return res.status(400).json({ error: "Already registered or waitlisted for this event" });
     }
     // Get user email
-    const user = await queryOne("SELECT email, full_name FROM users WHERE id = $1", [user_id]);
-    const currentRegistrations = await queryOne("SELECT COUNT(*) as count FROM registrations WHERE event_id = $1 AND status = 'registered'", [event_id]);
+    const user = await (0, db_js_1.queryOne)("SELECT email, full_name FROM users WHERE id = $1", [user_id]);
+    const currentRegistrations = await (0, db_js_1.queryOne)("SELECT COUNT(*) as count FROM registrations WHERE event_id = $1 AND status = 'registered'", [event_id]);
     if (event.capacity && currentRegistrations.count >= event.capacity) {
         // Event is full, add to waitlist
-        await execute("INSERT INTO registrations (user_id, event_id, status) VALUES ($1, $2, 'waitlisted')", [user_id, event_id]);
+        await (0, db_js_1.execute)("INSERT INTO registrations (user_id, event_id, status) VALUES ($1, $2, 'waitlisted')", [user_id, event_id]);
         res.json({ success: true, status: 'waitlisted', message: 'Added to waitlist' });
     }
     else {
         // Register normally
-        await execute("INSERT INTO registrations (user_id, event_id, status) VALUES ($1, $2, 'registered')", [user_id, event_id]);
+        await (0, db_js_1.execute)("INSERT INTO registrations (user_id, event_id, status) VALUES ($1, $2, 'registered')", [user_id, event_id]);
         // Send email with pass if it exists
         if (event.pass && user.email) {
             try {
@@ -1093,21 +1510,21 @@ app.post("/api/register-event", async (req, res) => {
 app.delete("/api/unregister-event/:userId/:eventId", async (req, res) => {
     const { userId, eventId } = req.params;
     // Check if user is registered
-    const registration = await queryOne("SELECT * FROM registrations WHERE user_id = $1 AND event_id = $2 AND status IN ('registered', 'waitlisted')", [userId, eventId]);
+    const registration = await (0, db_js_1.queryOne)("SELECT * FROM registrations WHERE user_id = $1 AND event_id = $2 AND status IN ('registered', 'waitlisted')", [userId, eventId]);
     if (!registration) {
         return res.status(404).json({ error: "Not registered for this event" });
     }
     // Remove registration
-    await execute("DELETE FROM registrations WHERE user_id = $1 AND event_id = $2", [userId, eventId]);
+    await (0, db_js_1.execute)("DELETE FROM registrations WHERE user_id = $1 AND event_id = $2", [userId, eventId]);
     // If they were registered (not waitlisted), check if we can promote someone from waitlist
     if (registration.status === 'registered') {
-        const event = await queryOne("SELECT capacity FROM events WHERE id = $1", [eventId]);
-        const currentRegistrations = await queryOne("SELECT COUNT(*) as count FROM registrations WHERE event_id = $1 AND status = 'registered'", [eventId]);
+        const event = await (0, db_js_1.queryOne)("SELECT capacity FROM events WHERE id = $1", [eventId]);
+        const currentRegistrations = await (0, db_js_1.queryOne)("SELECT COUNT(*) as count FROM registrations WHERE event_id = $1 AND status = 'registered'", [eventId]);
         if (event.capacity && currentRegistrations.count < event.capacity) {
             // Promote the first person from waitlist
-            const waitlistEntry = await queryOne("SELECT * FROM registrations WHERE event_id = $1 AND status = 'waitlisted' ORDER BY timestamp ASC LIMIT 1", [eventId]);
+            const waitlistEntry = await (0, db_js_1.queryOne)("SELECT * FROM registrations WHERE event_id = $1 AND status = 'waitlisted' ORDER BY timestamp ASC LIMIT 1", [eventId]);
             if (waitlistEntry) {
-                await execute("UPDATE registrations SET status = 'registered' WHERE id = $1", [waitlistEntry.id]);
+                await (0, db_js_1.execute)("UPDATE registrations SET status = 'registered' WHERE id = $1", [waitlistEntry.id]);
             }
         }
     }
@@ -1115,11 +1532,11 @@ app.delete("/api/unregister-event/:userId/:eventId", async (req, res) => {
 });
 app.post("/api/save-event", async (req, res) => {
     const { user_id, event_id } = req.body;
-    await execute("INSERT INTO saved_events (user_id, event_id) VALUES ($1, $2)", [user_id, event_id]);
+    await (0, db_js_1.execute)("INSERT INTO saved_events (user_id, event_id) VALUES ($1, $2)", [user_id, event_id]);
     res.json({ success: true });
 });
 app.get("/api/saved-events/:userId", async (req, res) => {
-    const events = await query(`
+    const events = await (0, db_js_1.query)(`
     SELECT events.* FROM events
     JOIN saved_events ON events.id = saved_events.event_id
     WHERE saved_events.user_id = $1
@@ -1130,7 +1547,7 @@ app.get("/api/saved-events/:userId", async (req, res) => {
 app.post("/api/follows", async (req, res) => {
     const { follower_id, following_id } = req.body;
     try {
-        await execute("INSERT INTO follows (follower_id, following_id) VALUES ($1, $2)", [follower_id, following_id]);
+        await (0, db_js_1.execute)("INSERT INTO follows (follower_id, following_id) VALUES ($1, $2)", [follower_id, following_id]);
         res.json({ success: true });
     }
     catch (e) {
@@ -1138,15 +1555,15 @@ app.post("/api/follows", async (req, res) => {
     }
 });
 app.delete("/api/follows/:followerId/:followingId", async (req, res) => {
-    await execute("DELETE FROM follows WHERE follower_id = $1 AND following_id = $2", [req.params.followerId, req.params.followingId]);
+    await (0, db_js_1.execute)("DELETE FROM follows WHERE follower_id = $1 AND following_id = $2", [req.params.followerId, req.params.followingId]);
     res.json({ success: true });
 });
 app.get("/api/follows/status/:followerId/:followingId", async (req, res) => {
-    const follow = await queryOne("SELECT * FROM follows WHERE follower_id = $1 AND following_id = $2", [req.params.followerId, req.params.followingId]);
+    const follow = await (0, db_js_1.queryOne)("SELECT * FROM follows WHERE follower_id = $1 AND following_id = $2", [req.params.followerId, req.params.followingId]);
     res.json({ isFollowing: !!follow });
 });
 app.get("/api/follows/counts/:userId", async (req, res) => {
-    const counts = await queryOne(`
+    const counts = await (0, db_js_1.queryOne)(`
     SELECT 
       (SELECT COUNT(*) FROM follows WHERE following_id = $1) as followers,
       (SELECT COUNT(*) FROM follows WHERE follower_id = $2) as following
@@ -1154,7 +1571,7 @@ app.get("/api/follows/counts/:userId", async (req, res) => {
     res.json(counts);
 });
 app.get("/api/follows/followers/:userId", async (req, res) => {
-    const followers = await query(`
+    const followers = await (0, db_js_1.query)(`
     SELECT u.id, u.username, u.full_name, u.role, u.bio
     FROM users u
     JOIN follows f ON u.id = f.follower_id
@@ -1163,7 +1580,7 @@ app.get("/api/follows/followers/:userId", async (req, res) => {
     res.json(followers);
 });
 app.get("/api/follows/following/:userId", async (req, res) => {
-    const following = await query(`
+    const following = await (0, db_js_1.query)(`
     SELECT u.id, u.username, u.full_name, u.role, u.bio
     FROM users u
     JOIN follows f ON u.id = f.following_id
@@ -1173,48 +1590,72 @@ app.get("/api/follows/following/:userId", async (req, res) => {
 });
 // Stories
 app.post("/api/stories", async (req, res) => {
-    const { content_type, content, background_color, text_color, font_size } = req.body;
+    const { content_type, content, background_color, text_color, font_size, visibility, user_id } = req.body;
+    // Get user_id from request body (frontend sends it explicitly)
+    const userId = user_id || req.user?.id || req.session?.userId;
+    if (!content_type || !content || !userId) {
+        return res.status(400).json({ error: "Content type, content, and user ID are required" });
+    }
     const expires_at = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours from now
-    const result = await queryOne(`
-    INSERT INTO stories (user_id, content_type, content, background_color, text_color, font_size, expires_at)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
-    RETURNING id
-  `, [req.user?.id || 1, content_type, content, background_color, text_color, font_size, expires_at.toISOString()]);
-    res.json({ id: result.id });
+    try {
+        const result = await (0, db_js_1.queryOne)(`
+      INSERT INTO stories (user_id, content_type, content, background_color, text_color, font_size, visibility, expires_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING id
+    `, [userId, content_type, content, background_color || '#000000', text_color || '#FFFFFF', font_size || 'medium', visibility || 'everyone', expires_at.toISOString()]);
+        res.json({ id: result.id, message: "Story created successfully" });
+    }
+    catch (e) {
+        console.error('Story creation error:', e);
+        res.status(500).json({ error: "Failed to create story" });
+    }
 });
 app.get("/api/stories", async (req, res) => {
     const userId = req.query.userId || req.user?.id || 1;
-    const requester = await queryOne("SELECT role FROM users WHERE id = $1", [userId]);
     // Get stories from users this user follows, plus their own stories
-    // Exclude admin stories for non-admin users
-    const stories = await query(`
-  SELECT s.*, u.username, u.full_name, u.avatar_url,
-         COUNT(sv.id) as view_count,
-         CASE WHEN sv2.viewer_id IS NOT NULL THEN 1 ELSE 0 END as viewed_by_me
-  FROM stories s
-  JOIN users u ON s.user_id = u.id
-  LEFT JOIN story_views sv ON s.id = sv.story_id
-  LEFT JOIN story_views sv2 ON s.id = sv2.story_id AND sv2.viewer_id = $1
-  WHERE s.expires_at > NOW()
-  AND (s.user_id = $2 OR s.user_id IN (
-    SELECT following_id FROM follows WHERE follower_id = $3
-  ))
-  AND (u.role != 'admin' OR s.user_id = $4)
-  GROUP BY 
-    s.id,
-    u.username,
-    u.full_name,
-    u.avatar_url,
-    sv2.viewer_id
-  ORDER BY s.created_at DESC
-`, [userId, userId, userId, userId]);
-    res.json(stories);
+    // Respect visibility settings: 'everyone' visible to all, 'followers' only to followers
+    try {
+        const stories = await (0, db_js_1.query)(`
+    SELECT s.*, u.username, u.full_name, u.avatar_url,
+           COUNT(DISTINCT sv.id) as view_count,
+           CASE WHEN sv2.viewer_id IS NOT NULL THEN 1 ELSE 0 END as viewed_by_me
+    FROM stories s
+    JOIN users u ON s.user_id = u.id
+    LEFT JOIN story_views sv ON s.id = sv.story_id
+    LEFT JOIN story_views sv2 ON s.id = sv2.story_id AND sv2.viewer_id = $1
+    WHERE s.expires_at > NOW()
+    AND (
+      -- Can see own stories
+      s.user_id = $2 
+      -- OR stories from people you follow (respect visibility)
+      OR (s.user_id IN (SELECT following_id FROM follows WHERE follower_id = $3)
+        AND s.visibility IN ('everyone', 'followers'))
+      -- OR public stories from anyone else
+      OR (s.visibility = 'everyone')
+    )
+    AND u.role != 'admin'
+    GROUP BY 
+      s.id,
+      u.id,
+      u.username,
+      u.full_name,
+      u.avatar_url,
+      sv2.viewer_id
+    ORDER BY s.created_at DESC
+  `, [userId, userId, userId]);
+        res.json(stories);
+    }
+    catch (err) {
+        console.error('Error fetching stories:', err.message);
+        res.status(500).json({ error: err.message });
+    }
 });
 app.post("/api/stories/:storyId/view", async (req, res) => {
-    const viewerId = req.user?.id || 1;
+    const { viewer_id } = req.body;
+    const viewerId = viewer_id || req.user?.id;
     try {
         // PostgreSQL doesn't have INSERT OR IGNORE, use INSERT ... ON CONFLICT
-        await execute(`
+        await (0, db_js_1.execute)(`
       INSERT INTO story_views (story_id, viewer_id)
       VALUES ($1, $2)
       ON CONFLICT (story_id, viewer_id) DO NOTHING
@@ -1226,19 +1667,20 @@ app.post("/api/stories/:storyId/view", async (req, res) => {
     }
 });
 app.delete("/api/stories/:storyId", async (req, res) => {
-    const userId = req.user?.id || 1;
-    const story = await queryOne("SELECT * FROM stories WHERE id = $1 AND user_id = $2", [req.params.storyId, userId]);
+    const { user_id } = req.body;
+    const userId = user_id || req.user?.id;
+    const story = await (0, db_js_1.queryOne)("SELECT * FROM stories WHERE id = $1 AND user_id = $2", [req.params.storyId, userId]);
     if (!story) {
         return res.status(404).json({ error: "Story not found" });
     }
-    await execute("DELETE FROM story_views WHERE story_id = $1", [req.params.storyId]);
-    await execute("DELETE FROM stories WHERE id = $1", [req.params.storyId]);
+    await (0, db_js_1.execute)("DELETE FROM story_views WHERE story_id = $1", [req.params.storyId]);
+    await (0, db_js_1.execute)("DELETE FROM stories WHERE id = $1", [req.params.storyId]);
     res.json({ success: true });
 });
 app.get("/api/users/suggestions/:userId", async (req, res) => {
     // Suggest users who are in the same college or have similar roll numbers, or are organizers
-    const user = await queryOne("SELECT college_name, role FROM users WHERE id = $1", [req.params.userId]);
-    const suggestions = await query(`
+    const user = await (0, db_js_1.queryOne)("SELECT college_name, role FROM users WHERE id = $1", [req.params.userId]);
+    const suggestions = await (0, db_js_1.query)(`
     SELECT DISTINCT u.id, u.username, u.full_name, u.role, u.avatar_url
     FROM users u
     LEFT JOIN events e ON u.id = e.created_by
@@ -1251,14 +1693,14 @@ app.get("/api/users/suggestions/:userId", async (req, res) => {
     res.json(suggestions);
 });
 app.get("/api/registrations/user/:userId", async (req, res) => {
-    const registrations = await query("SELECT event_id FROM registrations WHERE user_id = $1", [req.params.userId]);
+    const registrations = await (0, db_js_1.query)("SELECT event_id FROM registrations WHERE user_id = $1", [req.params.userId]);
     res.json(registrations.map((r) => r.event_id));
 });
 // Likes
 app.post("/api/likes", async (req, res) => {
     const { user_id, event_id } = req.body;
     try {
-        await execute("INSERT INTO likes (user_id, event_id) VALUES ($1, $2)", [user_id, event_id]);
+        await (0, db_js_1.execute)("INSERT INTO likes (user_id, event_id) VALUES ($1, $2)", [user_id, event_id]);
         res.json({ success: true });
     }
     catch (e) {
@@ -1266,26 +1708,26 @@ app.post("/api/likes", async (req, res) => {
     }
 });
 app.delete("/api/likes/:userId/:eventId", async (req, res) => {
-    await execute("DELETE FROM likes WHERE user_id = $1 AND event_id = $2", [req.params.userId, req.params.eventId]);
+    await (0, db_js_1.execute)("DELETE FROM likes WHERE user_id = $1 AND event_id = $2", [req.params.userId, req.params.eventId]);
     res.json({ success: true });
 });
 app.get("/api/likes/count/:eventId", async (req, res) => {
-    const count = await queryOne("SELECT COUNT(*) as count FROM likes WHERE event_id = $1", [req.params.eventId]);
+    const count = await (0, db_js_1.queryOne)("SELECT COUNT(*) as count FROM likes WHERE event_id = $1", [req.params.eventId]);
     res.json(count);
 });
 app.get("/api/likes/check/:userId/:eventId", async (req, res) => {
-    const like = await queryOne("SELECT * FROM likes WHERE user_id = $1 AND event_id = $2", [req.params.userId, req.params.eventId]);
+    const like = await (0, db_js_1.queryOne)("SELECT * FROM likes WHERE user_id = $1 AND event_id = $2", [req.params.userId, req.params.eventId]);
     res.json({ liked: !!like });
 });
 app.get("/api/likes/user/:userId", async (req, res) => {
-    const likes = await query("SELECT event_id FROM likes WHERE user_id = $1", [req.params.userId]);
+    const likes = await (0, db_js_1.query)("SELECT event_id FROM likes WHERE user_id = $1", [req.params.userId]);
     res.json(likes.map((l) => l.event_id));
 });
 // Bookmarks
 app.post("/api/bookmarks", async (req, res) => {
     const { user_id, event_id } = req.body;
     try {
-        await execute("INSERT INTO bookmarks (user_id, event_id) VALUES ($1, $2)", [user_id, event_id]);
+        await (0, db_js_1.execute)("INSERT INTO bookmarks (user_id, event_id) VALUES ($1, $2)", [user_id, event_id]);
         res.json({ success: true });
     }
     catch (e) {
@@ -1293,11 +1735,11 @@ app.post("/api/bookmarks", async (req, res) => {
     }
 });
 app.delete("/api/bookmarks/:userId/:eventId", async (req, res) => {
-    await execute("DELETE FROM bookmarks WHERE user_id = $1 AND event_id = $2", [req.params.userId, req.params.eventId]);
+    await (0, db_js_1.execute)("DELETE FROM bookmarks WHERE user_id = $1 AND event_id = $2", [req.params.userId, req.params.eventId]);
     res.json({ success: true });
 });
 app.get("/api/bookmarks/:userId", async (req, res) => {
-    const bookmarks = await query(`
+    const bookmarks = await (0, db_js_1.query)(`
     SELECT e.* FROM events e
     JOIN bookmarks b ON e.id = b.event_id
     WHERE b.user_id = $1
@@ -1308,11 +1750,11 @@ app.get("/api/bookmarks/:userId", async (req, res) => {
 // Event Reminders
 app.post("/api/reminders", async (req, res) => {
     const { user_id, event_id, reminder_time } = req.body;
-    await execute("INSERT INTO event_reminders (user_id, event_id, reminder_time) VALUES ($1, $2, $3)", [user_id, event_id, reminder_time]);
+    await (0, db_js_1.execute)("INSERT INTO event_reminders (user_id, event_id, reminder_time) VALUES ($1, $2, $3)", [user_id, event_id, reminder_time]);
     res.json({ success: true });
 });
 app.get("/api/reminders/:userId", async (req, res) => {
-    const reminders = await query(`
+    const reminders = await (0, db_js_1.query)(`
     SELECT er.*, e.title, e.date
     FROM event_reminders er
     JOIN events e ON er.event_id = e.id
@@ -1323,7 +1765,7 @@ app.get("/api/reminders/:userId", async (req, res) => {
 });
 // Activity Feed
 app.get("/api/activity/:userId", async (req, res) => {
-    const activity = await query(`
+    const activity = await (0, db_js_1.query)(`
     SELECT a.*, u.full_name, u.avatar_url, e.title as event_title
     FROM activity a
     JOIN users u ON a.user_id = u.id
@@ -1338,7 +1780,7 @@ app.get("/api/activity/:userId", async (req, res) => {
 });
 app.post("/api/activity", async (req, res) => {
     const { user_id, activity_type, target_user_id, target_event_id } = req.body;
-    await execute(`
+    await (0, db_js_1.execute)(`
     INSERT INTO activity (user_id, activity_type, target_user_id, target_event_id)
     VALUES ($1, $2, $3, $4)
   `, [user_id, activity_type, target_user_id, target_event_id]);
@@ -1352,30 +1794,30 @@ app.delete("/api/users/:id", async (req, res) => {
         const requesterId = req.query.requester || req.headers['x-requester-id'];
         let requester = null;
         if (requesterId) {
-            requester = await queryOne("SELECT * FROM users WHERE id = $1", [requesterId]);
+            requester = await (0, db_js_1.queryOne)("SELECT * FROM users WHERE id = $1", [requesterId]);
         }
         if (!requester || (requester.id != userId && requester.role !== 'admin')) {
             return res.status(403).json({ error: "Not authorized to delete this account" });
         }
-        await execute("DELETE FROM club_members WHERE user_id = $1", [userId]);
-        await execute("UPDATE clubs SET president_id = NULL WHERE president_id = $1", [userId]);
-        await execute("DELETE FROM club_follows WHERE user_id = $1", [userId]);
-        await execute("DELETE FROM likes WHERE user_id = $1", [userId]);
-        await execute("DELETE FROM bookmarks WHERE user_id = $1", [userId]);
-        await execute("DELETE FROM registrations WHERE user_id = $1", [userId]);
-        await execute("DELETE FROM comments WHERE user_id = $1", [userId]);
-        await execute("DELETE FROM follows WHERE follower_id = $1 OR following_id = $2", [userId, userId]);
-        await execute("DELETE FROM messages WHERE sender_id = $1 OR receiver_id = $2", [userId, userId]);
-        await execute("DELETE FROM notifications WHERE user_id = $1", [userId]);
-        await execute("DELETE FROM reminders WHERE user_id = $1", [userId]);
-        await execute("DELETE FROM event_reminders WHERE user_id = $1", [userId]);
-        await execute("DELETE FROM saved_events WHERE user_id = $1", [userId]);
-        await execute("DELETE FROM story_views WHERE viewer_id = $1", [userId]);
-        await execute("DELETE FROM stories WHERE user_id = $1", [userId]);
-        await execute("DELETE FROM activity WHERE user_id = $1 OR target_user_id = $2", [userId, userId]);
-        await execute("DELETE FROM role_requests WHERE requester_id = $1 OR target_user_id = $2", [userId, userId]);
-        await execute("DELETE FROM password_reset_tokens WHERE user_id = $1", [userId]);
-        await execute("DELETE FROM users WHERE id = $1", [userId]);
+        await (0, db_js_1.execute)("DELETE FROM club_members WHERE user_id = $1", [userId]);
+        await (0, db_js_1.execute)("UPDATE clubs SET president_id = NULL WHERE president_id = $1", [userId]);
+        await (0, db_js_1.execute)("DELETE FROM club_follows WHERE user_id = $1", [userId]);
+        await (0, db_js_1.execute)("DELETE FROM likes WHERE user_id = $1", [userId]);
+        await (0, db_js_1.execute)("DELETE FROM bookmarks WHERE user_id = $1", [userId]);
+        await (0, db_js_1.execute)("DELETE FROM registrations WHERE user_id = $1", [userId]);
+        await (0, db_js_1.execute)("DELETE FROM comments WHERE user_id = $1", [userId]);
+        await (0, db_js_1.execute)("DELETE FROM follows WHERE follower_id = $1 OR following_id = $2", [userId, userId]);
+        await (0, db_js_1.execute)("DELETE FROM messages WHERE sender_id = $1 OR receiver_id = $2", [userId, userId]);
+        await (0, db_js_1.execute)("DELETE FROM notifications WHERE user_id = $1", [userId]);
+        await (0, db_js_1.execute)("DELETE FROM reminders WHERE user_id = $1", [userId]);
+        await (0, db_js_1.execute)("DELETE FROM event_reminders WHERE user_id = $1", [userId]);
+        await (0, db_js_1.execute)("DELETE FROM saved_events WHERE user_id = $1", [userId]);
+        await (0, db_js_1.execute)("DELETE FROM story_views WHERE viewer_id = $1", [userId]);
+        await (0, db_js_1.execute)("DELETE FROM stories WHERE user_id = $1", [userId]);
+        await (0, db_js_1.execute)("DELETE FROM activity WHERE user_id = $1 OR target_user_id = $2", [userId, userId]);
+        await (0, db_js_1.execute)("DELETE FROM role_requests WHERE requester_id = $1 OR target_user_id = $2", [userId, userId]);
+        await (0, db_js_1.execute)("DELETE FROM password_reset_tokens WHERE user_id = $1", [userId]);
+        await (0, db_js_1.execute)("DELETE FROM users WHERE id = $1", [userId]);
         res.json({ success: true });
     }
     catch (e) {
@@ -1383,11 +1825,34 @@ app.delete("/api/users/:id", async (req, res) => {
         res.status(500).json({ error: "Failed to delete account", details: e.message });
     }
 });
+// admin helper: directly change role
+app.post("/api/users/:id/role", async (req, res) => {
+    const targetId = req.params.id;
+    const { role } = req.body;
+    const requesterId = req.query.requester || req.headers['x-requester-id'];
+    if (!requesterId)
+        return res.status(403).json({ error: 'Requester required' });
+    const requester = await (0, db_js_1.queryOne)("SELECT * FROM users WHERE id=$1", [requesterId]);
+    if (!requester || requester.role !== 'admin') {
+        return res.status(403).json({ error: 'Not authorized' });
+    }
+    if (!['admin', 'council_president', 'club_president', 'club_member', 'student'].includes(role)) {
+        return res.status(400).json({ error: 'Invalid role' });
+    }
+    try {
+        await (0, db_js_1.execute)("UPDATE users SET role=$1 WHERE id=$2", [role, targetId]);
+        res.json({ success: true });
+    }
+    catch (e) {
+        console.error('role change error', e);
+        res.status(500).json({ error: 'Failed to change role' });
+    }
+});
 // Background task for reminders
 setInterval(async () => {
     try {
         const now = new Date().toISOString();
-        const dueReminders = await query(`
+        const dueReminders = await (0, db_js_1.query)(`
       SELECT r.*, e.title 
       FROM reminders r 
       JOIN events e ON r.event_id = e.id 
@@ -1395,12 +1860,12 @@ setInterval(async () => {
     `, [now]);
         for (const reminder of dueReminders) {
             try {
-                await execute("INSERT INTO notifications (user_id, content, type) VALUES ($1, $2, $3)", [
+                await (0, db_js_1.execute)("INSERT INTO notifications (user_id, content, type) VALUES ($1, $2, $3)", [
                     reminder.user_id,
                     `Reminder: The event "${reminder.title}" starts in 1 hour!`,
                     'reminder'
                 ]);
-                await execute("UPDATE reminders SET is_triggered = 1 WHERE id = $1", [reminder.id]);
+                await (0, db_js_1.execute)("UPDATE reminders SET is_triggered = 1 WHERE id = $1", [reminder.id]);
             }
             catch (err) {
                 console.error('Reminder processing error:', err);
@@ -1414,9 +1879,9 @@ setInterval(async () => {
 // Start server
 // 🔎 DEBUG: check if dist/index.html exists on Render
 app.get("/__debug", (req, res) => {
-    const distPath = path.join(process.cwd(), "dist");
+    const distPath = path_1.default.join(process.cwd(), "dist");
     const fs = require("fs");
-    const exists = fs.existsSync(path.join(distPath, "index.html"));
+    const exists = fs.existsSync(path_1.default.join(distPath, "index.html"));
     res.json({
         cwd: process.cwd(),
         __dirname,
@@ -1427,13 +1892,13 @@ app.get("/__debug", (req, res) => {
 });
 // Serve frontend in production
 if (process.env.NODE_ENV === "production") {
-    const distPath = path.join(process.cwd(), "dist");
+    const distPath = path_1.default.join(process.cwd(), "dist");
     console.log("Serving dist from:", distPath);
-    console.log("index.html exists?", fs.existsSync(path.join(distPath, "index.html")));
-    app.use(express.static(distPath));
+    console.log("index.html exists?", fs_1.default.existsSync(path_1.default.join(distPath, "index.html")));
+    app.use(express_1.default.static(distPath));
     // SPA fallback (MUST be AFTER /__debug)
     app.get("*", (req, res) => {
-        res.sendFile(path.join(distPath, "index.html"));
+        res.sendFile(path_1.default.join(distPath, "index.html"));
     });
 }
 // Start server LAST
