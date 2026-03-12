@@ -59,6 +59,10 @@ async function initializeDatabase() {
         FOREIGN KEY(created_by) REFERENCES users(id)
       )
     `);
+    
+    // Add google_form_url column if it doesn't exist (migration for existing databases)
+    await execute(`ALTER TABLE events ADD COLUMN IF NOT EXISTS google_form_url TEXT`);
+    
     // insert some demo events if table empty (for fresh installs)
     try {
       const cntRow: any = await queryOne('SELECT COUNT(*) as cnt FROM events');
