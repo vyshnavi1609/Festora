@@ -344,6 +344,19 @@ async function initializeDatabase() {
     `);
 
     await execute(`
+      CREATE TABLE IF NOT EXISTS club_posts (
+        id SERIAL PRIMARY KEY,
+        club_id INTEGER,
+        user_id INTEGER,
+        content TEXT,
+        image_url TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(club_id) REFERENCES clubs(id),
+        FOREIGN KEY(user_id) REFERENCES users(id)
+      )
+    `);
+
+    await execute(`
       CREATE TABLE IF NOT EXISTS club_requests (
         id SERIAL PRIMARY KEY,
         requester_id INTEGER,
@@ -845,6 +858,66 @@ app.get("/api/clubs/:id/followers-count", async (req, res) => {
 app.get("/api/users/:id/clubs", async (req, res) => {
   const clubs = await query("SELECT c.* FROM clubs c JOIN club_members cm ON c.id = cm.club_id WHERE cm.user_id = $1", [req.params.id]);
   res.json(clubs);
+});
+
+// Club Posts
+app.post("/api/clubs/:id/posts", async (req, res) => {
+  const { user_id, content, image_url } = req.body;
+  const clubId = req.params.id;
+  
+  try {
+    // Verify user is club member
+    const isMember = await queryOne("SELECT id FROM club_members WHERE club_id = $1 AND user_id = $2", [clubId, user_id]);
+    if (!isMember) {
+      return res.status(403).json({ error: "Only club members can post" });
+    }
+    
+    const post = await queryOne(
+      "INSERT INTO club_posts (club_id, user_id, content, image_url) VALUES ($1, $2, $3, $4) RETURNING id, created_at",
+      [clubId, user_id, content, image_url]
+    );
+    
+    res.json({ message: "Post created successfully", post });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+app.get("/api/clubs/:id/posts", async (req, res) => {
+  const clubId = req.params.id;
+  
+  try {
+    const posts = await query(
+      "SELECT cp.id, cp.content, cp.image_url, cp.created_at, cp.user_id, u.full_name, u.avatar_url FROM club_posts cp JOIN users u ON cp.user_id = u.id WHERE cp.club_id = $1 ORDER BY cp.created_at DESC",
+      [clubId]
+    );
+    res.json(posts);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.delete("/api/clubs/:clubId/posts/:postId", async (req, res) => {
+  const { clubId, postId } = req.params;
+  const { user_id } = req.query;
+  
+  try {
+    // Verify post exists and user created it or is club president
+    const post = await queryOne("SELECT cp.user_id, c.president_id FROM club_posts cp JOIN clubs c ON cp.club_id = c.id WHERE cp.id = $1 AND cp.club_id = $2", [postId, clubId]);
+    
+    if (!post) {
+      return res.status(404).json({ error: "Post not found" });
+    }
+    
+    if (post.user_id !== Number(user_id) && post.president_id !== Number(user_id)) {
+      return res.status(403).json({ error: "You can only delete your own posts or are not authorized" });
+    }
+    
+    await execute("DELETE FROM club_posts WHERE id = $1", [postId]);
+    res.json({ message: "Post deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Club Request: Club President submits request to create a club
@@ -1543,10 +1616,32 @@ app.post("/api/role-requests/approve", async (req, res) => {
     // Update user role
     await execute("UPDATE users SET role = $1 WHERE id = $2", [request.requested_role, request.target_user_id]);
     
-    // If promoted to club_president, add as club president and club member
-    if (request.requested_role === 'club_president' && request.club_id) {
-      await execute("UPDATE clubs SET president_id = $1 WHERE id = $2", [request.target_user_id, request.club_id]);
-      await execute("INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (club_id, user_id) DO UPDATE SET role = 'president'", [request.club_id, request.target_user_id, 'president']);
+    // If promoted to club_president without existing club, create a new club
+    if (request.requested_role === 'club_president') {
+      if (request.club_id) {
+        // Existing club - update president
+        await execute("UPDATE clubs SET president_id = $1 WHERE id = $2", [request.target_user_id, request.club_id]);
+        await execute("INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (club_id, user_id) DO UPDATE SET role = 'president'", [request.club_id, request.target_user_id, 'president']);
+      } else {
+        // Create new club for the new president
+        const targetUser = await queryOne("SELECT full_name, college_name FROM users WHERE id = $1", [request.target_user_id]);
+        if (targetUser) {
+          const clubName = `${targetUser.full_name}'s Club`;
+          const college = await queryOne("SELECT college_code FROM users WHERE id = $1", [request.target_user_id]);
+          const collegeCode = college?.college_code || 'DEFAULT';
+          
+          const newClub = await queryOne(
+            "INSERT INTO clubs (name, description, president_id, created_by, college_code) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+            [clubName, `A club created for ${targetUser.full_name}`, request.target_user_id, request.target_user_id, collegeCode]
+          );
+          
+          // Add president as club member
+          await execute("INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3)", [newClub.id, request.target_user_id, 'president']);
+          
+          // Add to role request for tracking
+          await execute("UPDATE role_requests SET club_id = $1 WHERE id = $2", [newClub.id, requestId]);
+        }
+      }
     }
 
     // If promoted to club_member, add to the club
@@ -1650,6 +1745,41 @@ app.post("/api/admin/promote/:userId", async (req, res) => {
   } catch (err) {
     console.error('Admin promotion error:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Share event with friends
+app.post("/api/events/:id/share", async (req, res) => {
+  const { sender_id, friend_ids } = req.body;
+  const eventId = req.params.id;
+  
+  try {
+    const event = await queryOne("SELECT * FROM events WHERE id = $1", [eventId]);
+    if (!event) {
+      return res.status(404).json({ error: "Event not found" });
+    }
+    
+    const sender = await queryOne("SELECT full_name FROM users WHERE id = $1", [sender_id]);
+    if (!sender) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    // Send notifications to all selected friends
+    for (const friendId of friend_ids) {
+      await execute(
+        "INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)",
+        [
+          friendId,
+          `${sender.full_name} shared "${event.title}" with you!`,
+          'shared_event',
+          `/?event=${eventId}`
+        ]
+      );
+    }
+    
+    res.json({ success: true, message: `Event shared with ${friend_ids.length} friend(s)` });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

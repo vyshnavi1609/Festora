@@ -43,7 +43,8 @@ import {
   Share2,
   Github,
   Plus,
-  Activity
+  Activity,
+  Check
 } from 'lucide-react';
 
 import { Container, Card, Button } from './components';
@@ -699,6 +700,175 @@ const CommentModal = ({ event, user, onClose, onCommentAdded }: { event: Event, 
         <button type="submit" className="text-blue-500 font-bold px-2 text-sm">Post</button>
       </form>
     </motion.div>
+  );
+};
+
+const ShareEventModal = ({ isOpen, onClose, event, user, onShareComplete }: { isOpen: boolean, onClose: () => void, event: Event, user: User, onShareComplete: () => void }) => {
+  const [friends, setFriends] = useState<User[]>([]);
+  const [selectedFriends, setSelectedFriends] = useState<number[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchContacts();
+    }
+  }, [isOpen]);
+
+  const fetchContacts = async () => {
+    try {
+      const res = await fetch(`/api/followers/${user.id}`);
+      if (res.ok) {
+        const data = await res.json();
+        setFriends(data);
+      }
+    } catch (error) {
+      console.error('Error fetching friends:', error);
+    }
+  };
+
+  const handleShare = async () => {
+    if (selectedFriends.length === 0) {
+      alert('Please select at least one friend');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/events/${event.id}/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sender_id: user.id, friend_ids: selectedFriends })
+      });
+
+      if (res.ok) {
+        alert('Event shared successfully!');
+        setSelectedFriends([]);
+        onClose();
+        onShareComplete();
+      } else {
+        alert('Failed to share event');
+      }
+    } catch (error) {
+      console.error('Error sharing event:', error);
+      alert('Error sharing event');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    const link = `${window.location.origin}/?event=${event.id}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      alert('Event link copied to clipboard!');
+    } catch (err) {
+      console.error('Error copying link:', err);
+    }
+  };
+
+  const toggleFriend = (friendId: number) => {
+    setSelectedFriends(prev =>
+      prev.includes(friendId)
+        ? prev.filter(id => id !== friendId)
+        : [...prev, friendId]
+    );
+  };
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0, y: '100%' }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: '100%' }}
+          className="fixed inset-0 bg-white z-[60] flex flex-col"
+        >
+          <header className="h-14 flex items-center justify-between px-4 border-b border-gray-100 shrink-0">
+            <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <ChevronLeft size={24} />
+            </button>
+            <h2 className="font-black text-lg text-zinc-950">Share Event</h2>
+            <div className="w-10" />
+          </header>
+
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="mb-8">
+              <h3 className="font-black text-lg text-zinc-950 mb-2">{event.title}</h3>
+              <p className="text-sm text-zinc-500">at {event.location}</p>
+            </div>
+
+            <div className="mb-8">
+              <h4 className="text-[10px] font-black uppercase tracking-wider text-zinc-400 mb-4">Share Via Link</h4>
+              <button
+                onClick={handleCopyLink}
+                className="w-full bg-indigo-50 border border-indigo-200 rounded-2xl p-4 hover:bg-indigo-100 transition-colors active:scale-95 flex items-center justify-between"
+              >
+                <div className="text-left">
+                  <p className="text-[10px] font-black uppercase tracking-wider text-indigo-600">Copy Link</p>
+                  <p className="text-[12px] text-zinc-600 mt-1 truncate">/?event={event.id}</p>
+                </div>
+                <Share2 size={20} className="text-indigo-600" />
+              </button>
+            </div>
+
+            <div>
+              <h4 className="text-[10px] font-black uppercase tracking-wider text-zinc-400 mb-4">Share With Friends</h4>
+              {friends.length === 0 ? (
+                <p className="text-center text-zinc-400 py-8">No friends to share with yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {friends.map(friend => (
+                    <div
+                      key={friend.id}
+                      onClick={() => toggleFriend(friend.id)}
+                      className="flex items-center gap-3 p-4 rounded-2xl border border-zinc-200 cursor-pointer hover:bg-zinc-50 transition-all active:scale-95"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-rose-400 overflow-hidden shrink-0 flex items-center justify-center">
+                        <img 
+                          src={friend.avatar_url || `https://api.dicebear.com/7.x/identicon/svg?seed=${friend.username}`}
+                          alt={friend.full_name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-bold text-sm text-zinc-950">{friend.full_name}</p>
+                        <p className="text-xs text-zinc-500">@{friend.username}</p>
+                      </div>
+                      <div className="w-6 h-6 rounded-full border-2 border-zinc-300 flex items-center justify-center transition-all"
+                        style={{
+                          backgroundColor: selectedFriends.includes(friend.id) ? '#4f46e5' : 'transparent',
+                          borderColor: selectedFriends.includes(friend.id) ? '#4f46e5' : '#d4d4d8'
+                        }}
+                      >
+                        {selectedFriends.includes(friend.id) && (
+                          <Check size={14} className="text-white" />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="border-t border-zinc-100 p-4 flex gap-3 shrink-0">
+            <button
+              onClick={onClose}
+              className="flex-1 px-6 py-3 rounded-2xl border border-zinc-200 text-zinc-950 font-black text-sm hover:bg-zinc-50 transition-all active:scale-95"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleShare}
+              disabled={isLoading || selectedFriends.length === 0}
+              className="flex-1 px-6 py-3 rounded-2xl vibrant-gradient text-white font-black text-sm disabled:opacity-50 transition-all active:scale-95"
+            >
+              {isLoading ? 'Sharing...' : `Share (${selectedFriends.length})`}
+            </button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };
 
@@ -1380,7 +1550,7 @@ const DiscoverView = ({ events, user, onViewDetails }: { events: Event[], user: 
   );
 };
 
-const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, onEdit, onRefresh, setActiveTab, unreadCount, onViewProfile, onViewDetails, onSendMessage, pendingRequests, suggestions, onFollowSuggestion, onDelete }: { events: Event[], user: User, onRegister: (id: number) => void, onUnregister: (id: number) => void, onSave: (id: number) => void, onMessage: (id: number) => void, onEdit: (event: Event) => void, onRefresh: () => void, setActiveTab: (t: string) => void, unreadCount: number, onViewProfile: (userId: number) => void, onViewDetails: (event: Event) => void, onSendMessage?: (receiverId: number, content: string) => void, pendingRequests?: any[], suggestions?: User[], onFollowSuggestion?: (id: number) => void, onDelete?: (id: number) => void }) => {
+const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, onEdit, onRefresh, setActiveTab, unreadCount, onViewProfile, onViewDetails, onSendMessage, pendingRequests, suggestions, onFollowSuggestion, onDelete, onShare }: { events: Event[], user: User, onRegister: (id: number) => void, onUnregister: (id: number) => void, onSave: (id: number) => void, onMessage: (id: number) => void, onEdit: (event: Event) => void, onRefresh: () => void, setActiveTab: (t: string) => void, unreadCount: number, onViewProfile: (userId: number) => void, onViewDetails: (event: Event) => void, onSendMessage?: (receiverId: number, content: string) => void, pendingRequests?: any[], suggestions?: User[], onFollowSuggestion?: (id: number) => void, onDelete?: (id: number) => void, onShare?: (event: Event) => void }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [registeredEventIds, setRegisteredEventIds] = useState<number[]>([]);
   const [showCalendar, setShowCalendar] = useState(false);
@@ -1408,22 +1578,8 @@ const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, o
     setTimeout(() => setIsRefreshing(false), 500);
   };
 
-  const handleShareEvent = async (event: Event) => {
-    const shareData = {
-      title: event.title,
-      text: `Check out this event: ${event.title} at ${event.location}!`,
-      url: window.location.origin + `?event=${event.id}`
-    };
-    try {
-      if (navigator.share) {
-        await navigator.share(shareData);
-      } else {
-        await navigator.clipboard.writeText(shareData.url);
-        alert('Event link copied to clipboard!');
-      }
-    } catch (err) {
-      console.error('Error sharing:', err);
-    }
+  const handleShareEvent = (event: Event) => {
+    onShare?.(event);
   };
 
   return (
@@ -5180,6 +5336,7 @@ export default function App() {
   const [toast, setToast] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
   const [showClubRequestModal, setShowClubRequestModal] = useState(false);
   const [clubRequests, setClubRequests] = useState<any[]>([]);
+  const [shareEventModal, setShareEventModal] = useState<{ isOpen: boolean, event: Event | null }>({ isOpen: false, event: null });
 
   const fetchEvents = () => {
     const url = user?.college_name ? `/api/events?college_code=${encodeURIComponent(user.college_name)}` : '/api/events';
@@ -5449,6 +5606,7 @@ export default function App() {
               suggestions={suggestions}
               onFollowSuggestion={handleFollowSuggestion}
               onDelete={handleDeleteEvent}
+              onShare={(event) => setShareEventModal({ isOpen: true, event })}
             />
           )}
           {activeTab === 'discover' && (
@@ -5514,6 +5672,15 @@ export default function App() {
       </AnimatePresence>
 
       <ClubRequestModal user={user} isOpen={showClubRequestModal} onClose={() => setShowClubRequestModal(false)} onSubmit={() => setActiveTab('profile')} />
+      {shareEventModal.event && user && (
+        <ShareEventModal
+          isOpen={shareEventModal.isOpen}
+          onClose={() => setShareEventModal({ isOpen: false, event: null })}
+          event={shareEventModal.event}
+          user={user}
+          onShareComplete={() => fetchNotifications()}
+        />
+      )}
       <Navbar activeTab={activeTab} setActiveTab={(t) => { setPreviousTab(activeTab); setActiveTab(t); if (t !== 'create') setEditingEvent(null); if (t !== 'profile') setViewingProfileId(null); if (t !== 'home' && t !== 'promotions') setViewingEvent(null); }} user={user} />
       
       <AnimatePresence>
@@ -5530,11 +5697,7 @@ export default function App() {
             onRefresh={() => { fetchEvents(); fetchRegistrations(); }}
             onClose={() => setViewingEvent(null)}
             onViewProfile={handleViewProfile}
-            onShare={(e) => {
-              const url = window.location.origin + `?event=${e.id}`;
-              navigator.clipboard.writeText(url);
-              showToast('Link copied!');
-            }}
+            onShare={(e) => setShareEventModal({ isOpen: true, event: e })}
             onDelete={handleDeleteEvent}
           />
         )}

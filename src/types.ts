@@ -118,6 +118,18 @@ export interface ClubRequest {
   requester_name?: string;
 }
 
+export interface ClubPost {
+  id: number;
+  club_id: number;
+  user_id: number;
+  content: string;
+  image_url?: string;
+  created_at: string;
+  full_name?: string;
+  avatar_url?: string;
+}
+
+
 export interface ClubMember {
   id: number;
   club_id: number;
