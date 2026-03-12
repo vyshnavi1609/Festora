@@ -386,7 +386,8 @@ setInterval(async () => {
 
 // Express app initialization must come before all route definitions
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // temporary debug endpoint to verify database connectivity
 app.get("/debug/users", async (req, res) => {

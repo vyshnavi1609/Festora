@@ -59,15 +59,47 @@ const ImagePicker = ({ onImageSelected, currentImage }: { onImageSelected: (base
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const cameraInputRef = React.useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          // Scale down if too large
+          if (width > 1200) {
+            height = (height * 1200) / width;
+            width = 1200;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d')!;
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Compress as JPEG with 80% quality
+          resolve(canvas.toDataURL('image/jpeg', 0.8));
+        };
+      };
+    });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        onImageSelected(reader.result as string);
+      try {
+        const compressedImageData = await compressImage(file);
+        onImageSelected(compressedImageData);
         setShowOptions(false);
-      };
-      reader.readAsDataURL(file);
+      } catch (error) {
+        console.error('Image compression failed:', error);
+      }
     }
   };
 
@@ -891,9 +923,31 @@ const Stories = ({ user, onViewProfile, onSendMessage }: { user: User, onViewPro
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setSelectedImage(reader.result as string);
-        setStoryType('image');
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          // Scale down if too large
+          if (width > 1200) {
+            height = (height * 1200) / width;
+            width = 1200;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d')!;
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Compress as JPEG with 80% quality
+          const compressedData = canvas.toDataURL('image/jpeg', 0.8);
+          setSelectedImage(compressedData);
+          setStoryType('image');
+        };
       };
       reader.readAsDataURL(file);
     }
@@ -1697,16 +1751,46 @@ const CreateEventView = ({ user, onCreated, editingEvent, onCancel }: { user: Us
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setIsUploading(true);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData({ ...formData, image_url: reader.result as string });
+      try {
+        // Compress image before uploading
+        const canvas = document.createElement('canvas');
+        const img = new Image();
+        const reader = new FileReader();
+        
+        reader.onload = (event) => {
+          img.src = event.target?.result as string;
+          img.onload = () => {
+            let width = img.width;
+            let height = img.height;
+            
+            // Scale down if too large
+            if (width > 1200) {
+              height = (height * 1200) / width;
+              width = 1200;
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            const ctx = canvas.getContext('2d')!;
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // Compress as JPEG with 80% quality
+            const compressedData = canvas.toDataURL('image/jpeg', 0.8);
+            setFormData({ ...formData, image_url: compressedData });
+            setIsUploading(false);
+          };
+        };
+        
+        reader.readAsDataURL(file);
+      } catch (error) {
+        console.error('Image compression error:', error);
         setIsUploading(false);
-      };
-      reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -1761,8 +1845,20 @@ const CreateEventView = ({ user, onCreated, editingEvent, onCancel }: { user: Us
       console.log('Event posted successfully');
       onCreated();
     } else {
-      const err = await res.json().catch(() => ({ error: 'Unknown error' }));
-      console.error('Event submission error:', err);
+      let err: any = { error: 'Unknown error' };
+      try {
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          err = await res.json();
+        } else {
+          const text = await res.text();
+          console.error('Non-JSON response:', res.status, text);
+          err = { error: `Server error: ${res.status} - ${text.substring(0, 200)}` };
+        }
+      } catch (parseErr) {
+        console.error('Error parsing response:', parseErr);
+      }
+      console.error('Event submission error (Status: ' + res.status + '):', err);
       alert((err && err.error) || 'Failed to post event');
     }
   };
