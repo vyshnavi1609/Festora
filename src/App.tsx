@@ -3301,37 +3301,44 @@ const AdminDashboard = ({ user }: { user: User }) => {
             className="space-y-4"
           >
             {requests.filter(r => r.status === 'pending').map(req => (
-              <div key={req.id} className="bg-white p-5 rounded-3xl flex items-center justify-between border border-zinc-100 shadow-sm">
-                <div>
-                  <p className="text-sm font-black text-zinc-900">
-                    {req.requester_name} → {req.target_name}
-                  </p>
-                  <p className="text-[10px] text-indigo-600 uppercase font-black tracking-widest mt-1">
-                    Role: {req.requested_role.replace('_', ' ')}
-                  </p>
-                  {req.club_name && (
-                    <p className="text-[9px] text-zinc-500 uppercase tracking-widest mt-1">
-                      Club: {req.club_name}
+              <div key={req.id} className="bg-white p-5 rounded-3xl border border-zinc-100 shadow-sm">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <p className="text-sm font-black text-zinc-900">
+                      {req.requester_name} <span className="text-zinc-400">→</span> {req.target_name}
                     </p>
-                  )}
-                  {req.created_at && (
-                    <p className="text-[8px] text-zinc-400 mt-1">
-                      {new Date(req.created_at).toLocaleString()}
-                    </p>
-                  )}
+                    <div className="flex items-center gap-2 mt-2">
+                      <span className="bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-lg text-[10px] font-black">
+                        {req.requested_role.replace('_', ' ').toUpperCase()}
+                      </span>
+                      {req.club_name && (
+                        <span className="bg-blue-100 text-blue-700 px-2.5 py-1 rounded-lg text-[10px] font-black">
+                          {req.club_name}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-[8px] text-zinc-400 font-black whitespace-nowrap ml-2">
+                    {req.created_at && new Date(req.created_at).toLocaleDateString()}
+                  </span>
                 </div>
+                {req.description && (
+                  <p className="text-[10px] text-zinc-600 bg-zinc-50 p-2.5 rounded-lg mb-3 border border-zinc-100">
+                    <span className="font-black text-zinc-700">Reason: </span>{req.description}
+                  </p>
+                )}
                 <div className="flex gap-2">
                   <button 
                     onClick={() => handleApprove(req.id)}
-                    className="festora-gradient text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:brightness-110 transition-all shadow-lg shadow-indigo-100"
+                    className="flex-1 festora-gradient text-white px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:brightness-110 transition-all"
                   >
-                    Approve
+                    ✓ Approve
                   </button>
                   <button 
                     onClick={() => handleReject(req.id)}
-                    className="bg-zinc-100 text-zinc-600 px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-200 transition-all"
+                    className="flex-1 bg-zinc-100 text-zinc-600 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-zinc-200 transition-all"
                   >
-                    Reject
+                    ✗ Reject
                   </button>
                 </div>
               </div>
