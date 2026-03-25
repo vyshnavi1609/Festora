@@ -5332,6 +5332,10 @@ export default function App() {
         setActiveTab('profile');
       }
     }
+    const tab = urlParams.get('tab');
+    if (tab && ['home', 'search', 'create', 'profile', 'settings', 'notifications', 'club-requests'].includes(tab)) {
+      setActiveTab(tab);
+    }
   }, []);
 
   useEffect(() => {

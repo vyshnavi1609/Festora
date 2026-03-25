@@ -1481,7 +1481,7 @@ app.post("/api/role-requests", async (req, res) => {
           admin.id,
           `${isUserInitiated ? 'Request' : 'Approval requested'}: ${presenterName} wants to be Council President`,
           'role_request',
-          `/role-requests/${result.id}`
+          '?tab=home'
         ]);
         if (admin.email) {
           try {
@@ -1519,7 +1519,7 @@ app.post("/api/role-requests", async (req, res) => {
             ap.id,
             `${isUserInitiated ? 'Request' : 'Approval requested'}: ${presenterName} wants to be Club President`,
             'role_request',
-            `/role-requests/${result.id}`
+            '?tab=home'
           ]);
           if (ap.email) {
             try {
@@ -1551,7 +1551,7 @@ app.post("/api/role-requests", async (req, res) => {
               president.id,
               `${isUserInitiated ? 'Request' : 'Request to add'}: ${targetUser.full_name} wants to join your club`,
               'role_request',
-              `/role-requests/${result.id}`
+              '?tab=home'
             ]);
             if (president.email) {
               try {
