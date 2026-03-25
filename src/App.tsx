@@ -4951,6 +4951,108 @@ const RoleRequestsView = ({ user, onBack }: { user: User, onBack?: () => void })
   );
 };
 
+// Single Role Request Detail View
+const RoleRequestDetailView = ({ id, user, onBack }: { id: number, user: User, onBack: () => void }) => {
+  const [request, setRequest] = useState<any | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    fetch(`/api/role-requests/detail/${id}`)
+      .then(res => res.json())
+      .then(setRequest)
+      .catch(() => setRequest(null));
+  }, [id]);
+
+  const handleApprove = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/role-requests/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: id, approver_id: user.id })
+      });
+      if (res.ok) {
+        alert('Request approved!');
+        onBack();
+      } else {
+        const error = await res.json();
+        alert('Error: ' + error.error);
+      }
+    } catch (err) {
+      alert('Failed to approve request');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleReject = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/role-requests/reject`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: id, approver_id: user.id })
+      });
+      if (res.ok) {
+        alert('Request rejected!');
+        onBack();
+      } else {
+        const error = await res.json();
+        alert('Error: ' + error.error);
+      }
+    } catch (err) {
+      alert('Failed to reject request');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (!request) return <div className="p-6 text-center">Loading...</div>;
+
+  return (
+    <div className="min-h-screen bg-zinc-50">
+      <div className="max-w-md mx-auto bg-white min-h-screen">
+        <div className="p-6 border-b border-zinc-100">
+          <button onClick={onBack} className="mb-4 text-zinc-400 hover:text-zinc-600">
+            ← Back
+          </button>
+          <h2 className="text-2xl font-black tracking-tighter text-zinc-950">Role Request</h2>
+        </div>
+        <div className="p-6 space-y-6">
+          <div className="bg-zinc-50 rounded-2xl p-4">
+            <p className="font-black text-sm text-zinc-900 mb-2">{request.requester_name}</p>
+            <p className="text-[10px] text-zinc-500 mb-1">Current Role: {request.requester_role}</p>
+            <p className="text-[10px] text-zinc-500 mb-1">Requested Role: <span className="font-black text-blue-600">{request.requested_role.replace('_', ' ').toUpperCase()}</span></p>
+            {request.club_name && <p className="text-[10px] text-zinc-500 mb-1">Club: {request.club_name}</p>}
+            {request.description && (
+              <div className="mt-3">
+                <p className="text-[10px] font-black text-zinc-700 mb-1">Description:</p>
+                <p className="text-[10px] text-zinc-600 bg-white rounded-lg p-3 border">{request.description}</p>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-3">
+            <button 
+              onClick={handleReject}
+              disabled={isLoading}
+              className="flex-1 bg-red-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all border border-red-100 active:scale-95 disabled:opacity-50"
+            >
+              Reject
+            </button>
+            <button 
+              onClick={handleApprove}
+              disabled={isLoading}
+              className="flex-1 bg-green-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-green-100 transition-all border border-green-100 active:scale-95 disabled:opacity-50"
+            >
+              Approve
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Club Requests Admin View (for Council President)
 const ClubRequestsView = ({ user, onBack }: { user: User, onBack?: () => void }) => {
   const [requests, setRequests] = useState<any[]>([]);
@@ -5344,6 +5446,12 @@ export default function App() {
     if (tab && ['home', 'search', 'create', 'profile', 'settings', 'notifications', 'club-requests'].includes(tab)) {
       setActiveTab(tab);
     }
+    const view = urlParams.get('view');
+    const id = urlParams.get('id');
+    if (view === 'role-request' && id) {
+      setViewingRoleRequestId(Number(id));
+      setActiveTab('role-request');
+    }
   }, []);
 
   useEffect(() => {
@@ -5357,6 +5465,7 @@ export default function App() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
   const [viewingProfileId, setViewingProfileId] = useState<number | null>(null);
+  const [viewingRoleRequestId, setViewingRoleRequestId] = useState<number | null>(null);
   const [viewingEvent, setViewingEvent] = useState<Event | null>(null);
   const [registeringEvent, setRegisteringEvent] = useState<Event | null>(null);
   const [registeredEventIds, setRegisteredEventIds] = useState<number[]>([]);
@@ -5697,6 +5806,13 @@ export default function App() {
                 <AdminDashboard user={user} />
               )}
             </div>
+          )}
+          {activeTab === 'role-request' && viewingRoleRequestId && (
+            <RoleRequestDetailView 
+              id={viewingRoleRequestId} 
+              user={user} 
+              onBack={() => { setViewingRoleRequestId(null); setActiveTab('home'); }} 
+            />
           )}
           {activeTab === 'settings' && <SettingsView user={user} onLogout={() => setUser(null)} onBack={() => setActiveTab(previousTab)} setActiveTab={setActiveTab} onOpenClubRequest={() => setShowClubRequestModal(true)} />}
           {activeTab === 'club-requests' && user.role === 'council_president' && <ClubRequestsView user={user} onBack={() => setActiveTab(previousTab)} />}

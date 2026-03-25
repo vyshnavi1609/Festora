@@ -1478,7 +1478,7 @@ app.post("/api/role-requests", async (req, res) => {
           admin.id,
           `${isUserInitiated ? 'Request' : 'Approval requested'}: ${presenterName} wants to be Council President`,
           'role_request',
-          '?tab=home'
+          `?view=role-request&id=${result.id}`
         ]);
         if (admin.email) {
           try {
@@ -1516,7 +1516,7 @@ app.post("/api/role-requests", async (req, res) => {
             ap.id,
             `${isUserInitiated ? 'Request' : 'Approval requested'}: ${presenterName} wants to be Club President`,
             'role_request',
-            '?tab=home'
+            `?view=role-request&id=${result.id}`
           ]);
           if (ap.email) {
             try {
@@ -1548,7 +1548,7 @@ app.post("/api/role-requests", async (req, res) => {
               president.id,
               `${isUserInitiated ? 'Request' : 'Request to add'}: ${targetUser.full_name} wants to join your club`,
               'role_request',
-              '?tab=home'
+              `?view=role-request&id=${result.id}`
             ]);
             if (president.email) {
               try {
@@ -1987,6 +1987,25 @@ app.post("/api/events/:id/share", async (req, res) => {
     
     res.json({ success: true, message: `Event shared with ${friend_ids.length} friend(s)` });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Role Request Detail
+app.get("/api/role-requests/detail/:id", async (req, res) => {
+  try {
+    const request = await queryOne(`
+      SELECT rr.*, u.full_name as requester_name, u.role as requester_role, c.name as club_name
+      FROM role_requests rr
+      JOIN users u ON rr.target_user_id = u.id
+      LEFT JOIN clubs c ON rr.club_id = c.id
+      WHERE rr.id = $1
+    `, [req.params.id]);
+    if (!request) {
+      return res.status(404).json({ error: "Request not found" });
+    }
+    res.json(request);
+  } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
 });
