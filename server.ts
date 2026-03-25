@@ -2475,7 +2475,8 @@ app.delete("/api/users/:id", async (req, res) => {
     if (requesterId) {
       requester = await queryOne("SELECT * FROM users WHERE id = $1", [requesterId]);
     }
-    if (!requester || (requester.id != userId && requester.role !== 'admin')) {
+    // Allow deletion if: admin OR user deleting themselves
+    if (!requester || (requester.role !== 'admin' && requester.id != userId)) {
       return res.status(403).json({ error: "Not authorized to delete this account" });
     }
     await execute("DELETE FROM club_members WHERE user_id = $1", [userId]);
