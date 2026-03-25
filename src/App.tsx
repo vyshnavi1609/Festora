@@ -2763,33 +2763,6 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
             </div>
           </div>
         </div>
-        {profileSuggestions.length > 0 && (
-          <div className="mb-8">
-            <h4 className="text-xs font-black uppercase tracking-widest text-zinc-500 mb-3">Discover people</h4>
-            <div className="flex gap-3">
-              {profileSuggestions.slice(0, 4).map(s => (
-                <div key={s.id} className="flex-shrink-0 w-20 text-center">
-                  <button onClick={() => onViewProfile(s.id)} className="flex flex-col items-center gap-2">
-                    <div className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center border-2 border-white shadow-sm" style={{background: s.avatar_url ? 'transparent' : 'linear-gradient(135deg,#fde68a,#fbcfe8)'}}>
-                      {s.avatar_url ? (
-                        <img src={s.avatar_url} alt={s.full_name} className="w-full h-full object-cover" />
-                      ) : (
-                        <img src={`https://api.dicebear.com/7.x/identicon/svg?seed=${s.username}`} alt={s.full_name} className="w-full h-full object-cover" />
-                      )}
-                    </div>
-                    <p className="font-black text-[11px] leading-tight text-zinc-900 truncate w-full">{s.full_name.split(' ')[0]}</p>
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onFollowSuggestion && onFollowSuggestion(s.id); }}
-                    className="mt-2 mx-auto w-8 h-8 text-white rounded-full bg-indigo-600 flex items-center justify-center hover:bg-indigo-700 transition-colors"
-                  >
-                    <UserPlus size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
         
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
