@@ -1562,41 +1562,84 @@ app.get("/api/role-requests/:userId", async (req, res) => {
       )
     `);
 
-    const user = await queryOne("SELECT role FROM users WHERE id = $1", [req.params.userId]);
+    const user = await queryOne("SELECT role, college_name FROM users WHERE id = $1", [req.params.userId]);
     if (!user) {
       console.warn('User not found:', req.params.userId);
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Build the query safely without information_schema check
+    // Build the query based on user role
     let requests: any[] = [];
-    if (['admin', 'council_president', 'club_president'].includes(user.role)) {
+    if (user.role === 'admin') {
+      // Admins see all role requests
       requests = await query(
         `SELECT role_requests.*,
                u1.full_name as requester_name,
-               u2.full_name as target_name
+               u2.full_name as target_name,
+               c.name as club_name
          FROM role_requests
          JOIN users u1 ON role_requests.requester_id = u1.id
          JOIN users u2 ON role_requests.target_user_id = u2.id
-         WHERE role_requests.target_user_id = $1 OR role_requests.requester_id = $1
+         LEFT JOIN clubs c ON role_requests.club_id = c.id
+         ORDER BY role_requests.created_at DESC`,
+        []
+      );
+    } else if (user.role === 'council_president') {
+      // Council presidents see:
+      // 1. Requests where they are target or requester
+      // 2. Club president requests for clubs in their college (approval duty)
+      requests = await query(
+        `SELECT DISTINCT role_requests.*,
+               u1.full_name as requester_name,
+               u2.full_name as target_name,
+               c.name as club_name
+         FROM role_requests
+         JOIN users u1 ON role_requests.requester_id = u1.id
+         JOIN users u2 ON role_requests.target_user_id = u2.id
+         LEFT JOIN clubs c ON role_requests.club_id = c.id
+         WHERE role_requests.target_user_id = $1 
+            OR role_requests.requester_id = $1
+            OR (role_requests.requested_role = 'club_president' AND c.college_code = $2 AND role_requests.status = 'pending')
+         ORDER BY role_requests.created_at DESC`,
+        [req.params.userId, user.college_name]
+      );
+    } else if (user.role === 'club_president') {
+      // Club presidents see:
+      // 1. Requests where they are target or requester
+      // 2. Club member requests for their club
+      requests = await query(
+        `SELECT DISTINCT role_requests.*,
+               u1.full_name as requester_name,
+               u2.full_name as target_name,
+               c.name as club_name
+         FROM role_requests
+         JOIN users u1 ON role_requests.requester_id = u1.id
+         JOIN users u2 ON role_requests.target_user_id = u2.id
+         LEFT JOIN clubs c ON role_requests.club_id = c.id
+         WHERE role_requests.target_user_id = $1 
+            OR role_requests.requester_id = $1
+            OR (role_requests.requested_role = 'club_member' AND c.president_id = $1 AND role_requests.status = 'pending')
          ORDER BY role_requests.created_at DESC`,
         [req.params.userId]
       );
     } else {
+      // Regular students and club members only see requests where they are the target
       requests = await query(
         `SELECT role_requests.*,
                u1.full_name as requester_name,
-               u2.full_name as target_name
+               u2.full_name as target_name,
+               c.name as club_name
          FROM role_requests
          JOIN users u1 ON role_requests.requester_id = u1.id
          JOIN users u2 ON role_requests.target_user_id = u2.id
+         LEFT JOIN clubs c ON role_requests.club_id = c.id
          WHERE role_requests.target_user_id = $1
          ORDER BY role_requests.created_at DESC`,
         [req.params.userId]
       );
     }
     
-    console.log(`Found ${requests.length} role requests for user ${req.params.userId}`);
+    console.log(`Found ${requests.length} role requests for user ${req.params.userId} with role ${user.role}`);
     res.json(requests);
   } catch (err) {
     console.error('Error fetching role requests:', err);
@@ -1606,11 +1649,37 @@ app.get("/api/role-requests/:userId", async (req, res) => {
 });
 
 app.post("/api/role-requests/approve", async (req, res) => {
-  const { requestId } = req.body;
+  const { requestId, approver_id } = req.body;
   try {
     const request = await queryOne("SELECT * FROM role_requests WHERE id = $1", [requestId]);
     if (!request) {
       return res.status(404).json({ error: "Request not found" });
+    }
+
+    // If approver_id provided, verify they have authority to approve
+    if (approver_id) {
+      const approver = await queryOne("SELECT role, college_name FROM users WHERE id = $1", [approver_id]);
+      if (!approver) {
+        return res.status(403).json({ error: "Approver not found" });
+      }
+
+      // Check if approver has authority based on request type
+      let hasAuthority = false;
+      if (approver.role === 'admin') {
+        hasAuthority = true; // Admin can approve anything
+      } else if (approver.role === 'council_president' && request.requested_role === 'club_president') {
+        // Council president can approve club_president requests for their college
+        const club = await queryOne("SELECT college_code FROM clubs WHERE id = $1", [request.club_id]);
+        hasAuthority = club && club.college_code === approver.college_name;
+      } else if (approver.role === 'club_president' && request.requested_role === 'club_member') {
+        // Club president can approve club_member requests for their club
+        const club = await queryOne("SELECT president_id FROM clubs WHERE id = $1", [request.club_id]);
+        hasAuthority = club && club.president_id === approver_id;
+      }
+
+      if (!hasAuthority) {
+        return res.status(403).json({ error: "You do not have authority to approve this request" });
+      }
     }
 
     // Update user role
@@ -1660,34 +1729,74 @@ app.post("/api/role-requests/approve", async (req, res) => {
       `/profile/${request.target_user_id}`
     ]);
     
+    console.log(`Role request ${requestId} approved for user ${request.target_user_id} to role ${request.requested_role}`);
     res.json({ success: true, message: `User promoted to ${roleDisplay}` });
   } catch (err) {
+    console.error('Error approving role request:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
 app.post("/api/role-requests/reject", async (req, res) => {
-  const { requestId } = req.body;
-  const request = await queryOne("SELECT * FROM role_requests WHERE id = $1", [requestId]);
-  if (request) {
+  const { requestId, approver_id } = req.body;
+  try {
+    const request = await queryOne("SELECT * FROM role_requests WHERE id = $1", [requestId]);
+    if (!request) {
+      return res.status(404).json({ error: "Request not found" });
+    }
+
+    // If already processed, return error
+    if (request.status !== 'pending') {
+      return res.status(400).json({ error: `Request has already been ${request.status}` });
+    }
+
+    // If approver_id provided, verify they have authority to reject
+    if (approver_id) {
+      const approver = await queryOne("SELECT role, college_name FROM users WHERE id = $1", [approver_id]);
+      if (!approver) {
+        return res.status(403).json({ error: "Approver not found" });
+      }
+
+      // Check if approver has authority based on request type
+      let hasAuthority = false;
+      if (approver.role === 'admin') {
+        hasAuthority = true; // Admin can reject anything
+      } else if (approver.role === 'council_president' && request.requested_role === 'club_president') {
+        // Council president can reject club_president requests for their college
+        const club = await queryOne("SELECT college_code FROM clubs WHERE id = $1", [request.club_id]);
+        hasAuthority = club && club.college_code === approver.college_name;
+      } else if (approver.role === 'club_president' && request.requested_role === 'club_member') {
+        // Club president can reject club_member requests for their club
+        const club = await queryOne("SELECT president_id FROM clubs WHERE id = $1", [request.club_id]);
+        hasAuthority = club && club.president_id === approver_id;
+      }
+
+      if (!hasAuthority) {
+        return res.status(403).json({ error: "You do not have authority to reject this request" });
+      }
+    }
+
     await execute("UPDATE role_requests SET status = 'rejected' WHERE id = $1", [requestId]);
     
     // Create notification
-    await execute("INSERT INTO notifications (user_id, content, type) VALUES ($1, $2, $3)", [
+    await execute("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [
       request.target_user_id,
       `Your request for ${request.requested_role.replace('_', ' ')} has been rejected.`,
-      'role_update'
+      'role_update',
+      `/role-requests/${requestId}`
     ]);
-    
-    res.json({ success: true });
-  } else {
-    res.status(404).json({ error: "Request not found" });
+
+    console.log(`Role request ${requestId} rejected for user ${request.target_user_id}`);
+    res.json({ success: true, message: "Request rejected" });
+  } catch (err) {
+    console.error('Error rejecting role request:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-// Admin direct promotion
+// Admin direct promotion - creates audit trail via role_requests table
 app.post("/api/admin/promote/:userId", async (req, res) => {
-  const { admin_id, requested_role } = req.body;
+  const { admin_id, requested_role, club_id } = req.body;
   const targetUserId = req.params.userId;
   
   try {
@@ -1698,7 +1807,7 @@ app.post("/api/admin/promote/:userId", async (req, res) => {
     }
 
     // Verify target user exists
-    const targetUser = await queryOne("SELECT id, role, email, full_name FROM users WHERE id = $1", [targetUserId]);
+    const targetUser = await queryOne("SELECT id, role, email, full_name, college_name FROM users WHERE id = $1", [targetUserId]);
     if (!targetUser) {
       return res.status(404).json({ error: "User not found" });
     }
@@ -1707,8 +1816,36 @@ app.post("/api/admin/promote/:userId", async (req, res) => {
       return res.status(400).json({ error: "Cannot change admin role" });
     }
 
+    // Create audit trail entry in role_requests table with status='approved'
+    const auditResult = await queryOne(
+      "INSERT INTO role_requests (requester_id, target_user_id, requested_role, status, club_id, description) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+      [admin_id, targetUserId, requested_role, 'approved', club_id || null, 'Admin direct promotion']
+    );
+
     // Update user's role
     await execute("UPDATE users SET role = $1 WHERE id = $2", [requested_role, targetUserId]);
+
+    // Handle club assignments for promoted roles
+    if (requested_role === 'club_president') {
+      if (club_id) {
+        await execute("UPDATE clubs SET president_id = $1 WHERE id = $2", [targetUserId, club_id]);
+        await execute("INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (club_id, user_id) DO UPDATE SET role = 'president'", [club_id, targetUserId, 'president']);
+        await execute("UPDATE role_requests SET club_id = $1 WHERE id = $2", [club_id, auditResult.id]);
+      } else {
+        // Create new club for the admin-promoted president
+        const clubName = `${targetUser.full_name}'s Club`;
+        const newClub = await queryOne(
+          "INSERT INTO clubs (name, description, president_id, created_by, college_code) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+          [clubName, `A club created for ${targetUser.full_name}`, targetUserId, admin_id, targetUser.college_name || 'DEFAULT']
+        );
+        await execute("INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3)", [newClub.id, targetUserId, 'president']);
+        await execute("UPDATE role_requests SET club_id = $1 WHERE id = $2", [newClub.id, auditResult.id]);
+      }
+    }
+
+    if (requested_role === 'club_member' && club_id) {
+      await execute("INSERT INTO club_members (club_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT (club_id, user_id) DO UPDATE SET role = 'member'", [club_id, targetUserId, 'member']);
+    }
 
     // Create notification
     await execute("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [
@@ -1741,7 +1878,7 @@ app.post("/api/admin/promote/:userId", async (req, res) => {
       }
     }
 
-    res.json({ success: true, message: `User promoted to ${requested_role}` });
+    res.json({ success: true, message: `User promoted to ${requested_role}`, auditId: auditResult.id });
   } catch (err) {
     console.error('Admin promotion error:', err);
     res.status(500).json({ error: err.message });

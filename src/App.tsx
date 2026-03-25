@@ -3136,7 +3136,7 @@ const AdminDashboard = ({ user }: { user: User }) => {
       const res = await fetch('/api/role-requests/approve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId })
+        body: JSON.stringify({ requestId, approver_id: user.id })
       });
       if (!res.ok) throw new Error(`status ${res.status}`);
     } catch (err) {
@@ -3151,7 +3151,7 @@ const AdminDashboard = ({ user }: { user: User }) => {
       const res = await fetch('/api/role-requests/reject', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId })
+        body: JSON.stringify({ requestId, approver_id: user.id })
       });
       if (!res.ok) throw new Error(`status ${res.status}`);
     } catch (err) {
@@ -4815,7 +4815,7 @@ const RoleRequestsView = ({ user, onBack }: { user: User, onBack?: () => void })
       const res = await fetch(`/api/role-requests/approve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, reviewedBy: user.id })
+        body: JSON.stringify({ requestId, approver_id: user.id })
       });
       if (res.ok) {
         alert('Role request approved!');
@@ -4841,7 +4841,7 @@ const RoleRequestsView = ({ user, onBack }: { user: User, onBack?: () => void })
       const res = await fetch(`/api/role-requests/reject`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId, reviewedBy: user.id, reason })
+        body: JSON.stringify({ requestId, approver_id: user.id })
       });
       if (res.ok) {
         alert('Request rejected');
