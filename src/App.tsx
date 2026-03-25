@@ -665,39 +665,68 @@ const CommentModal = ({ event, user, onClose, onCommentAdded }: { event: Event, 
       initial={{ opacity: 0, y: '100%' }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: '100%' }}
-      className="fixed inset-0 bg-white z-[60] flex flex-col"
+      className="fixed inset-0 bg-white z-[60] flex flex-col max-w-md mx-auto md:rounded-3xl md:shadow-2xl md:border md:border-zinc-100"
     >
-      <header className="h-14 flex items-center px-4 border-b border-gray-100 shrink-0">
-        <button onClick={onClose} className="mr-4"><ChevronLeft size={24} /></button>
-        <h2 className="font-bold">Comments</h2>
+      <header className="h-16 flex items-center px-6 border-b border-zinc-100 shrink-0 bg-white sticky top-0">
+        <button onClick={onClose} className="mr-4 p-2 hover:bg-zinc-50 rounded-full transition-all active:scale-90">
+          <ChevronLeft size={24} />
+        </button>
+        <h2 className="font-black text-lg text-zinc-950 flex-1">Comments</h2>
+        <p className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.1em]">{comments.length}</p>
       </header>
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {comments.map(comment => (
-          <div key={comment.id} className="flex gap-3">
-            <div className="w-8 h-8 rounded-full bg-gray-100 overflow-hidden shrink-0">
-              <img src={`https://api.dicebear.com/7.x/identicon/svg?seed=${comment.username}`} alt="avatar" />
-            </div>
-            <div>
-              <p className="text-sm">
-                <span className="font-bold mr-2">{comment.username}</span>
-                {comment.content}
-              </p>
-              <p className="text-[10px] text-gray-400 mt-1">
-                {new Date(comment.timestamp).toLocaleDateString()}
-              </p>
-            </div>
+      <div className="flex-1 overflow-y-auto space-y-4 p-6">
+        {comments.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <MessageCircle size={48} className="text-zinc-200 mb-4" />
+            <p className="text-sm font-black text-zinc-400 uppercase tracking-widest">No comments yet</p>
+            <p className="text-[10px] text-zinc-300 mt-2">Be the first to comment</p>
           </div>
-        ))}
+        ) : (
+          comments.map(comment => (
+            <div key={comment.id} className="flex gap-3 group">
+              <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 border-2 border-white shadow-md">
+                <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.username}`} alt="avatar" className="w-full h-full object-cover" />
+              </div>
+              <div className="flex-1">
+                <div className="bg-zinc-50 rounded-2xl px-4 py-3 transition-all group-hover:bg-zinc-100">
+                  <p className="text-sm">
+                    <span className="font-black text-zinc-950 mr-2">{comment.username}</span>
+                    <span className="text-zinc-700 font-medium">{comment.content}</span>
+                  </p>
+                </div>
+                <div className="flex gap-4 px-4 py-2">
+                  <p className="text-[10px] font-black text-zinc-400 uppercase tracking-[0.1em]">
+                    {new Date(comment.timestamp).toLocaleDateString()}
+                  </p>
+                  <button type="button" className="text-[10px] font-black text-zinc-400 hover:text-zinc-600 transition-colors uppercase tracking-[0.1em]">
+                    Like
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
       </div>
-      <form onSubmit={handleSubmit} className="p-4 border-t border-gray-100 flex gap-2">
-        <input 
-          type="text" 
-          placeholder="Add a comment..." 
-          className="flex-1 bg-gray-100 rounded-full px-4 py-2 outline-none text-sm"
-          value={newComment}
-          onChange={e => setNewComment(e.target.value)}
-        />
-        <button type="submit" className="text-blue-500 font-bold px-2 text-sm">Post</button>
+      <form onSubmit={handleSubmit} className="p-6 border-t border-zinc-100 bg-white sticky bottom-0 flex gap-3 items-center">
+        <div className="w-10 h-10 rounded-full overflow-hidden shrink-0 border-2 border-white shadow-md">
+          <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} alt="your avatar" className="w-full h-full object-cover" />
+        </div>
+        <div className="flex-1 flex gap-2 bg-zinc-50 rounded-full px-4 py-2 items-center border border-zinc-200 focus-within:border-indigo-400 transition-colors">
+          <input 
+            type="text" 
+            placeholder="Add a comment..." 
+            className="flex-1 bg-transparent outline-none text-sm font-medium text-zinc-950 placeholder-zinc-400"
+            value={newComment}
+            onChange={e => setNewComment(e.target.value)}
+          />
+          <button 
+            type="submit" 
+            disabled={!newComment.trim()}
+            className="text-indigo-600 hover:text-indigo-700 font-black text-sm disabled:text-zinc-300 disabled:cursor-not-allowed transition-colors active:scale-90"
+          >
+            Post
+          </button>
+        </div>
       </form>
     </motion.div>
   );
