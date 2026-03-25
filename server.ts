@@ -1414,11 +1414,6 @@ app.post("/api/role-requests", async (req, res) => {
       return res.status(400).json({ error: 'requester_id, target_user_id and requested_role are required' });
     }
     
-    // council_president can only be promoted by admin, not through requests
-    if (requested_role === 'council_president') {
-      return res.status(400).json({ error: 'Council President roles can only be assigned by administrators' });
-    }
-    
     // Validate requester exists and get their role
     const requester = await queryOne("SELECT role, college_name FROM users WHERE id = $1", [requester_id]);
     if (!requester) {
