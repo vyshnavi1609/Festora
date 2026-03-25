@@ -1431,9 +1431,6 @@ app.post("/api/role-requests", async (req, res) => {
 
     if (isUserInitiated) {
       // User-initiated requests: student or club_member can request roles for themselves
-      if (requested_role === 'club_president' && !club_id) {
-        return res.status(400).json({ error: 'club_id is required when requesting club_president' });
-      }
       if (requested_role === 'club_member' && !club_id) {
         return res.status(400).json({ error: 'club_id is required when requesting club_member' });
       }
@@ -1724,6 +1721,8 @@ app.post("/api/role-requests/approve", async (req, res) => {
       return res.status(404).json({ error: "Request not found" });
     }
 
+    const targetUser = await queryOne("SELECT college_name FROM users WHERE id = $1", [request.target_user_id]);
+
     // If approver_id provided, verify they have authority to approve
     if (approver_id) {
       const approver = await queryOne("SELECT role, college_name FROM users WHERE id = $1", [approver_id]);
@@ -1737,8 +1736,12 @@ app.post("/api/role-requests/approve", async (req, res) => {
         hasAuthority = true; // Admin can approve anything
       } else if (approver.role === 'council_president' && request.requested_role === 'club_president') {
         // Council president can approve club_president requests for their college
-        const club = await queryOne("SELECT college_code FROM clubs WHERE id = $1", [request.club_id]);
-        hasAuthority = club && club.college_code === approver.college_name;
+        if (request.club_id) {
+          const club = await queryOne("SELECT college_code FROM clubs WHERE id = $1", [request.club_id]);
+          hasAuthority = club && club.college_code === approver.college_name;
+        } else {
+          hasAuthority = targetUser && targetUser.college_name === approver.college_name;
+        }
       } else if (approver.role === 'club_president' && request.requested_role === 'club_member') {
         // Club president can approve club_member requests for their club
         const club = await queryOne("SELECT president_id FROM clubs WHERE id = $1", [request.club_id]);

@@ -2954,6 +2954,14 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                   👑 Request Council President Role
                 </button>
               )}
+              {targetUser?.role === 'council_president' && user.id !== targetUser?.id && user.role !== 'admin' && user.role !== 'council_president' && user.role !== 'club_president' && (
+                <button 
+                  onClick={() => sendRoleRequest(0, 'club_president')}
+                  className="w-full bg-amber-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-100 transition-all border border-amber-100 active:scale-95"
+                >
+                  ⭐ Request Club President Role
+                </button>
+              )}
               {user.role === 'admin' && targetUser?.role !== 'admin' && (
                 <button 
                   onClick={() => promoteToCouncilPresident(targetUser.id)}
