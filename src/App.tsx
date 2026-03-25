@@ -1641,8 +1641,8 @@ const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, o
       
 
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="col-span-1 lg:col-span-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="col-span-1 md:col-span-2">
           {events.length === 0 && (
             <div className="py-20 text-center text-zinc-400">
               <Calendar size={48} className="mx-auto mb-4 opacity-20" />
@@ -1677,7 +1677,7 @@ const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, o
 
         {/* Suggested Users Sidebar */}
         {suggestions && suggestions.length > 0 && (
-          <div className="col-span-1 hidden lg:block">
+          <div className="col-span-1">
             <div className="sticky top-24 bg-white rounded-3xl border border-zinc-100 p-6 shadow-sm">
               <h3 className="font-black text-lg mb-4 text-zinc-950">Suggested Users</h3>
               <div className="space-y-4">
