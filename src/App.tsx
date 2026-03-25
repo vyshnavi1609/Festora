@@ -1641,35 +1641,76 @@ const HomeView = ({ events, user, onRegister, onUnregister, onSave, onMessage, o
       
 
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {events.length === 0 && (
-          <div className="col-span-1 md:col-span-2 py-20 text-center text-zinc-400">
-            <Calendar size={48} className="mx-auto mb-4 opacity-20" />
-            <p className="font-bold">No events found</p>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="col-span-1 lg:col-span-2">
+          {events.length === 0 && (
+            <div className="py-20 text-center text-zinc-400">
+              <Calendar size={48} className="mx-auto mb-4 opacity-20" />
+              <p className="font-bold">No events found</p>
+            </div>
+          )}
+
+          <div className="space-y-6">
+            {events.map(event => (
+              <div key={event.id} className="w-full">
+                <EventCard 
+                  event={event} 
+                  user={user} 
+                  onRegister={onRegister} 
+                  onUnregister={onUnregister}
+                  onSave={onSave} 
+                  onMessage={onMessage} 
+                  onEdit={onEdit} 
+                  onRefresh={onRefresh} 
+                  onViewProfile={onViewProfile}
+                  onShare={handleShareEvent}
+                  onViewDetails={onViewDetails}
+                  isRegistered={registeredEventIds.includes(event.id)}
+                  isLiked={likedEventIds.includes(event.id)}
+                  onLike={fetchLikes}
+                  onDelete={onDelete}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Suggested Users Sidebar */}
+        {suggestions && suggestions.length > 0 && (
+          <div className="col-span-1 hidden lg:block">
+            <div className="sticky top-24 bg-white rounded-3xl border border-zinc-100 p-6 shadow-sm">
+              <h3 className="font-black text-lg mb-4 text-zinc-950">Suggested Users</h3>
+              <div className="space-y-4">
+                {suggestions.map(suggestion => (
+                  <div key={suggestion.id} className="flex items-center justify-between group">
+                    <button 
+                      onClick={() => onViewProfile(suggestion.id)}
+                      className="flex items-center gap-3 flex-1 hover:opacity-75 transition-opacity"
+                    >
+                      <div className="w-10 h-10 rounded-full overflow-hidden flex-shrink-0 bg-gradient-to-br from-indigo-200 to-purple-200">
+                        <img 
+                          src={`https://api.dicebear.com/7.x/identicon/svg?seed=${suggestion.username}`}
+                          alt={suggestion.full_name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-black text-sm text-zinc-900 truncate">{suggestion.full_name}</p>
+                        <p className="text-[11px] text-zinc-500 truncate">@{suggestion.username}</p>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => onFollowSuggestion?.(suggestion.id)}
+                      className="ml-2 flex-shrink-0 bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-[11px] font-black hover:bg-indigo-700 transition-colors active:scale-95"
+                    >
+                      Follow
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
-
-        {events.map(event => (
-          <div key={event.id} className="w-full">
-            <EventCard 
-              event={event} 
-              user={user} 
-              onRegister={onRegister} 
-              onUnregister={onUnregister}
-              onSave={onSave} 
-              onMessage={onMessage} 
-              onEdit={onEdit} 
-              onRefresh={onRefresh} 
-              onViewProfile={onViewProfile}
-              onShare={handleShareEvent}
-              onViewDetails={onViewDetails}
-              isRegistered={registeredEventIds.includes(event.id)}
-              isLiked={likedEventIds.includes(event.id)}
-              onLike={fetchLikes}
-              onDelete={onDelete}
-            />
-          </div>
-        ))}
       </div>
 
       <CalendarModal 
