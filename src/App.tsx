@@ -2946,7 +2946,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                   </button>
                 </>
               )}
-              {targetUser?.role === 'council_president' && user.id !== targetUser?.id && user.role === 'club_president' && (
+              {targetUser?.role === 'council_president' && user.id !== targetUser?.id && user.role !== 'admin' && user.role !== 'council_president' && (
                 <button 
                   onClick={() => sendRoleRequest(0, 'council_president')}
                   className="w-full bg-purple-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-purple-100 transition-all border border-purple-100 active:scale-95"
