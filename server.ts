@@ -1475,7 +1475,37 @@ app.post("/api/role-requests", async (req, res) => {
     // Determine who should approve this request and notify them
     let approverIds: number[] = [];
     
-    if (requested_role === 'club_president') {
+    if (requested_role === 'council_president') {
+      // Council president requests go to admin for approval
+      const admins = await query("SELECT id, email, full_name FROM users WHERE role = 'admin'", []);
+      approverIds = admins.map((a: any) => a.id);
+      
+      const presenterName = isUserInitiated ? targetUser.full_name : requester.full_name;
+      for (const admin of admins) {
+        await execute("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [
+          admin.id,
+          `${isUserInitiated ? 'Request' : 'Approval requested'}: ${presenterName} wants to be Council President`,
+          'role_request',
+          `/role-requests/${result.id}`
+        ]);
+        if (admin.email) {
+          try {
+            const emailBody = isUserInitiated 
+              ? `<p>${presenterName} (${requester.role}) has requested to become a Council President. Please review and approve or reject the request in Festora.</p>`
+              : `<p>${requester.full_name} has requested that <strong>${targetUser.full_name}</strong> be made Council President. Please review and approve or reject the request in Festora.</p>`;
+            
+            await emailTransporter.sendMail({
+              from: process.env.EMAIL_FROM,
+              to: admin.email,
+              subject: `Council President Request from ${presenterName}`,
+              html: `<p>Hi ${admin.full_name},</p>${emailBody}<p>Best regards,<br>Festora Team</p>`
+            });
+          } catch (emailError) {
+            console.error('Failed to send approval email:', emailError);
+          }
+        }
+      }
+    } else if (requested_role === 'club_president') {
       // Club president requests go to council president of that college
       const clubInfo = club_id 
         ? await queryOne("SELECT college_code FROM clubs WHERE id = $1", [club_id])
