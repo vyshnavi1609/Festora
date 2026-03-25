@@ -1105,6 +1105,10 @@ app.get("/api/events/user/:id/count", async (req, res) => {
   res.json(count);
 });
 
+app.get("/api/users/:id/events", async (req, res) => {
+  const events = await query("SELECT * FROM events WHERE created_by = $1 ORDER BY date DESC", [req.params.id]);
+  res.json(events);
+});
 
 // Get events, filter private events by college code if provided
 app.get("/api/events", async (req, res) => {

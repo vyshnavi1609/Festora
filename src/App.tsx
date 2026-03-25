@@ -2525,6 +2525,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
   const [followingList, setFollowingList] = useState<User[]>([]);
   const [profileClubs, setProfileClubs] = useState<any[]>([]);
   const [userEventsCount, setUserEventsCount] = useState(0);
+  const [userCreatedEvents, setUserCreatedEvents] = useState<Event[]>([]);
   const [profileSuggestions, setProfileSuggestions] = useState<User[]>([]);
   const [showClubPresidentRequestModal, setShowClubPresidentRequestModal] = useState(false);
   const [showClubMemberRequestModal, setShowClubMemberRequestModal] = useState(false);
@@ -2572,8 +2573,16 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
         } else {
           setProfileClubs([]);
         }
+        // Fetch events created by this user
+        const eventsRes = await fetch(`/api/users/${effectiveUserId}/events`);
+        if (eventsRes.ok) {
+          setUserCreatedEvents(await eventsRes.json());
+        } else {
+          setUserCreatedEvents([]);
+        }
       } else {
         setProfileClubs([]);
+        setUserCreatedEvents([]);
       }
     } else if (res.status === 403) {
       setProfileError('You cannot view this profile. Only the admin can view admin profiles.');
@@ -2986,7 +2995,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
         </div>
 
         <div className="grid grid-cols-3 gap-1 mt-1">
-          {(activeTab === 'posts' ? [] : savedEvents).map(event => (
+          {(activeTab === 'posts' ? userCreatedEvents : savedEvents).map(event => (
             <div key={event.id} className="aspect-square bg-zinc-100 overflow-hidden relative group cursor-pointer" onClick={() => onViewProfile(event.created_by)}>
               <img 
                 src={event.image_url || `https://picsum.photos/seed/${event.id}/400/400`} 
@@ -2996,10 +3005,10 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
               />
             </div>
           ))}
-          {activeTab === 'posts' && (
+          {activeTab === 'posts' && userCreatedEvents.length === 0 && (
             <div className="col-span-3 py-20 text-center text-zinc-300">
               <PlusSquare size={48} className="mx-auto mb-3 opacity-20" />
-              <p className="text-xs font-black uppercase tracking-widest">No posts yet</p>
+              <p className="text-xs font-black uppercase tracking-widest">No events yet</p>
             </div>
           )}
           {activeTab === 'saved' && savedEvents.length === 0 && (
@@ -4568,20 +4577,9 @@ const EventDetailsView = ({ event, user, isRegistered, onRegister, onUnregister,
       </header>
 
       <div className="max-w-md mx-auto">
-        <div className="aspect-[4/3] w-full relative">
-          <img 
-            src={event.image_url || `https://picsum.photos/seed/${event.id}/800/600`} 
-            alt={event.title} 
-            className="w-full h-full object-cover"
-            referrerPolicy="no-referrer"
-          />
-          <div className={`absolute bottom-6 left-6 px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-2xl ${getCategoryClass(event.category)}`}>
-            {event.category || 'Social'}
-          </div>
-        </div>
 
         <div className="p-8">
-          <h1 className="text-3xl font-black tracking-tighter text-zinc-950 mb-4">{event.title}</h1>
+          <h1 className="text-3xl font-black tracking-tighter text-zinc-950 mb-6">{event.title}</h1>
           
           <div className="flex items-center gap-4 mb-8 p-4 bg-zinc-50 rounded-3xl border border-zinc-100">
             <div 
@@ -4591,28 +4589,14 @@ const EventDetailsView = ({ event, user, isRegistered, onRegister, onUnregister,
               <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${event.organizer_name}`} alt="organizer" />
             </div>
             <div className="flex-1">
-              <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Organized by</p>
               <p className="text-sm font-black text-zinc-950">{event.organizer_name}</p>
             </div>
-            <button 
-              onClick={() => onMessage(event.created_by)}
-              className="p-3 bg-white text-indigo-600 rounded-2xl shadow-sm hover:shadow-md transition-all border border-zinc-100"
-            >
-              <Send size={18} />
-            </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mb-8">
-            <div className="p-5 bg-zinc-50 rounded-3xl border border-zinc-100">
-              <Calendar className="text-indigo-600 mb-3" size={20} />
-              <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Date & Time</p>
-              <p className="text-xs font-black text-zinc-950">{new Date(event.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-            </div>
-            <div className="p-5 bg-zinc-50 rounded-3xl border border-zinc-100">
-              <MapPin className="text-rose-600 mb-3" size={20} />
-              <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Location</p>
-              <p className="text-xs font-black text-zinc-950 truncate">{event.location}</p>
-            </div>
+          <div className="p-5 bg-zinc-50 rounded-3xl border border-zinc-100 mb-8">
+            <MapPin className="text-rose-600 mb-3" size={20} />
+            <p className="text-[10px] font-black text-zinc-400 uppercase tracking-widest mb-1">Location</p>
+            <p className="text-xs font-black text-zinc-950">{event.location}</p>
           </div>
 
           <div className="mb-10">
