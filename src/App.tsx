@@ -2526,6 +2526,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
   const [profileClubs, setProfileClubs] = useState<any[]>([]);
   const [userEventsCount, setUserEventsCount] = useState(0);
   const [profileSuggestions, setProfileSuggestions] = useState<User[]>([]);
+  const [showClubPresidentRequestModal, setShowClubPresidentRequestModal] = useState(false);
   const [editData, setEditData] = useState({
     bio: '',
     social_links: { instagram: '', twitter: '', linkedin: '', website: '' },
@@ -2646,7 +2647,13 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
     try {
       let description = '';
       if (role === 'club_president') {
-        description = prompt('Why would you like to become a club president? (optional):') || '';
+        const clubName = prompt('Enter club name:');
+        if (!clubName) return;
+        const clubDescription = prompt('Enter club description (optional):') || '';
+        description = JSON.stringify({ club_name: clubName, club_description: clubDescription });
+      } else {
+        description = prompt('Why are you requesting this role? (optional):') || '';
+      }
       }
 
       const body: any = { 
@@ -2939,20 +2946,12 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                     </button>
                   )}
                   <button 
-                    onClick={() => sendRoleRequest(0, 'club_president')}
+                    onClick={() => setShowClubPresidentRequestModal(true)}
                     className="w-full bg-amber-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-100 transition-all border border-amber-100 active:scale-95"
                   >
                     ⭐ Request Club President Role
                   </button>
                 </>
-              )}
-              {targetUser?.role === 'council_president' && user.id !== targetUser?.id && user.role !== 'admin' && user.role !== 'council_president' && (
-                <button 
-                  onClick={() => sendRoleRequest(0, 'council_president')}
-                  className="w-full bg-purple-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-purple-100 transition-all border border-purple-100 active:scale-95"
-                >
-                  👑 Request Council President Role
-                </button>
               )}
               {targetUser?.role === 'council_president' && user.id !== targetUser?.id && user.role !== 'admin' && user.role !== 'council_president' && user.role !== 'club_president' && (
                 <button 
@@ -5030,6 +5029,23 @@ const RoleRequestDetailView = ({ id, user, onBack }: { id: number, user: User, o
                 <p className="text-[10px] text-zinc-600 bg-white rounded-lg p-3 border">{request.description}</p>
               </div>
             )}
+            {(() => {
+              try {
+                const parsed = JSON.parse(request.description);
+                if (parsed.club_name) {
+                  return (
+                    <div className="mt-3">
+                      <p className="text-[10px] font-black text-zinc-700 mb-1">Proposed Club:</p>
+                      <p className="text-[10px] text-zinc-600 bg-white rounded-lg p-3 border">
+                        <strong>{parsed.club_name}</strong>
+                        {parsed.club_description && <><br/>{parsed.club_description}</>}
+                      </p>
+                    </div>
+                  );
+                }
+              } catch (e) {}
+              return null;
+            })()}
           </div>
           <div className="flex gap-3">
             <button 

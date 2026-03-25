@@ -1766,13 +1766,19 @@ app.post("/api/role-requests/approve", async (req, res) => {
         // Create new club for the new president
         const targetUser = await queryOne("SELECT full_name, college_name FROM users WHERE id = $1", [request.target_user_id]);
         if (targetUser) {
-          const clubName = `${targetUser.full_name}'s Club`;
+          let clubDetails = { club_name: `${targetUser.full_name}'s Club`, club_description: `A club created for ${targetUser.full_name}` };
+          try {
+            const parsed = JSON.parse(request.description);
+            if (parsed.club_name) clubDetails.club_name = parsed.club_name;
+            if (parsed.club_description) clubDetails.club_description = parsed.club_description;
+          } catch (e) {}
+          
           const college = await queryOne("SELECT college_code FROM users WHERE id = $1", [request.target_user_id]);
           const collegeCode = college?.college_code || 'DEFAULT';
           
           const newClub = await queryOne(
             "INSERT INTO clubs (name, description, president_id, created_by, college_code) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-            [clubName, `A club created for ${targetUser.full_name}`, request.target_user_id, request.target_user_id, collegeCode]
+            [clubDetails.club_name, clubDetails.club_description, request.target_user_id, request.target_user_id, collegeCode]
           );
           
           // Add president as club member
