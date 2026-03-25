@@ -2946,12 +2946,6 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                       🎯 Request to Join Club
                     </button>
                   )}
-                  <button 
-                    onClick={() => setShowClubPresidentRequestModal(true)}
-                    className="w-full bg-amber-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-100 transition-all border border-amber-100 active:scale-95"
-                  >
-                    ⭐ Request Club President Role
-                  </button>
                 </>
               )}
               {targetUser?.role === 'council_president' && user.id !== targetUser?.id && user.role !== 'admin' && user.role !== 'council_president' && user.role !== 'club_president' && (
