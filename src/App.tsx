@@ -2654,7 +2654,6 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
       } else {
         description = prompt('Why are you requesting this role? (optional):') || '';
       }
-      }
 
       const body: any = { 
         requester_id: user.id,  // Current user making the request
