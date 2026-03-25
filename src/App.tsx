@@ -2527,6 +2527,8 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
   const [userEventsCount, setUserEventsCount] = useState(0);
   const [profileSuggestions, setProfileSuggestions] = useState<User[]>([]);
   const [showClubPresidentRequestModal, setShowClubPresidentRequestModal] = useState(false);
+  const [showClubMemberRequestModal, setShowClubMemberRequestModal] = useState(false);
+  const [clubMemberRequestData, setClubMemberRequestData] = useState({ reason: '' });
   const [editData, setEditData] = useState({
     bio: '',
     social_links: { instagram: '', twitter: '', linkedin: '', website: '' },
@@ -2938,7 +2940,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                 <>
                   {profileClubs.length > 0 && (
                     <button 
-                      onClick={() => sendRoleRequest(profileClubs[0].id, 'club_member')}
+                      onClick={() => setShowClubMemberRequestModal(true)}
                       className="w-full bg-rose-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all border border-rose-100 active:scale-95"
                     >
                       🎯 Request to Join Club
@@ -3031,6 +3033,77 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
             onClose={() => setShowFollowing(false)} 
             onViewProfile={onViewProfile} 
           />
+        )}
+        {showClubMemberRequestModal && profileClubs.length > 0 && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6"
+            onClick={() => setShowClubMemberRequestModal(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-6 border-b border-zinc-100">
+                <h3 className="text-2xl font-black tracking-tighter text-zinc-950 mb-1">Request Club Membership</h3>
+                <p className="text-[10px] text-zinc-500">Explain why you want to join</p>
+              </div>
+              <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+                <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-2">Reason (Optional)</label>
+                  <textarea 
+                    placeholder="Tell us why you want to join this club..."
+                    value={clubMemberRequestData.reason}
+                    onChange={e => setClubMemberRequestData({ ...clubMemberRequestData, reason: e.target.value })}
+                    className="input-field h-24 resize-none"
+                  />
+                </div>
+              </div>
+              <div className="p-6 border-t border-zinc-100 flex gap-3">
+                <button 
+                  onClick={() => setShowClubMemberRequestModal(false)}
+                  className="flex-1 bg-zinc-100 text-zinc-900 py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-zinc-200 transition-all active:scale-95"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={async () => {
+                    try {
+                      const res = await fetch('/api/role-requests', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          requester_id: user.id,
+                          target_user_id: user.id,
+                          requested_role: 'club_member',
+                          club_id: profileClubs[0].id,
+                          description: clubMemberRequestData.reason || ''
+                        })
+                      });
+                      if (res.ok) {
+                        alert('Club membership request sent!');
+                        setShowClubMemberRequestModal(false);
+                        setClubMemberRequestData({ reason: '' });
+                      } else {
+                        const error = await res.json();
+                        alert('Error: ' + error.error);
+                      }
+                    } catch (err) {
+                      alert('Failed to send request');
+                    }
+                  }}
+                  className="flex-1 bg-rose-600 text-white py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-700 transition-all active:scale-95"
+                >
+                  Send Request
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
