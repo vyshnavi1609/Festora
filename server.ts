@@ -1408,7 +1408,7 @@ const roleHierarchy = {
 
 app.post("/api/role-requests", async (req, res) => {
   const { requester_id, target_user_id, requested_role, club_id, description } = req.body;
-  console.log('Role request POST body:', { requester_id, target_user_id, requested_role, club_id, hasDescription: !!description });
+  console.log('Role request POST body:', { requester_id, target_user_id, requested_role, club_id, isUserInitiated: requester_id === target_user_id, hasDescription: !!description });
   try {
     if (!requester_id || !target_user_id || !requested_role) {
       return res.status(400).json({ error: 'requester_id, target_user_id and requested_role are required' });
@@ -1419,10 +1419,6 @@ app.post("/api/role-requests", async (req, res) => {
       return res.status(400).json({ error: 'Council President roles can only be assigned by administrators' });
     }
     
-    // club_id is required when requesting a club_president role so we know which club
-    if (requested_role === 'club_president' && !club_id) {
-      return res.status(400).json({ error: 'club_id is required when requesting a club president' });
-    }
     // Validate requester exists and get their role
     const requester = await queryOne("SELECT role, college_name FROM users WHERE id = $1", [requester_id]);
     if (!requester) {
@@ -1435,23 +1431,40 @@ app.post("/api/role-requests", async (req, res) => {
       return res.status(404).json({ error: "Target user not found" });
     }
 
-    // Check if requester can promote to this role (hierarchy check)
-    const allowedRoles = roleHierarchy[requester.role] || [];
-    if (!allowedRoles.includes(requested_role)) {
-      return res.status(403).json({ error: `Your role ${requester.role} cannot promote to ${requested_role}. Allowed roles: ${allowedRoles.join(', ')}` });
-    }
+    // Determine if this is a user-initiated request (requester requesting for themselves)
+    const isUserInitiated = requester_id === target_user_id;
 
-    // If promoting to club_president, club_id is required and club must be in same college
-    if (requested_role === 'club_president') {
-      if (!club_id) {
-        return res.status(400).json({ error: "club_id is required when promoting to club_president" });
+    if (isUserInitiated) {
+      // User-initiated requests: student or club_member can request roles for themselves
+      if (requested_role === 'club_president' && !club_id) {
+        return res.status(400).json({ error: 'club_id is required when requesting club_president' });
       }
-      const club = await queryOne("SELECT college_code FROM clubs WHERE id = $1", [club_id]);
-      if (!club) {
-        return res.status(404).json({ error: "Club not found" });
+      if (requested_role === 'club_member' && !club_id) {
+        return res.status(400).json({ error: 'club_id is required when requesting club_member' });
       }
-      if (club.college_code !== requester.college_name) {
-        return res.status(403).json({ error: "Can only promote to clubs in your college" });
+      // Allow any user to request these roles (validation happens on approval)
+    } else {
+      // Authority-initiated requests: check hierarchy
+      // club_id is required when requesting a club_president role so we know which club
+      if (requested_role === 'club_president' && !club_id) {
+        return res.status(400).json({ error: 'club_id is required when requesting a club president' });
+      }
+
+      // Check if requester can promote to this role (hierarchy check)
+      const allowedRoles = roleHierarchy[requester.role] || [];
+      if (!allowedRoles.includes(requested_role)) {
+        return res.status(403).json({ error: `Your role ${requester.role} cannot promote to ${requested_role}. Allowed roles: ${allowedRoles.join(', ')}` });
+      }
+
+      // If promoting to club_president, club_id is required and club must be in same college
+      if (requested_role === 'club_president') {
+        const club = await queryOne("SELECT college_code FROM clubs WHERE id = $1", [club_id]);
+        if (!club) {
+          return res.status(404).json({ error: "Club not found" });
+        }
+        if (club.college_code !== requester.college_name) {
+          return res.status(403).json({ error: "Can only promote to clubs in your college" });
+        }
       }
     }
 
@@ -1459,28 +1472,41 @@ app.post("/api/role-requests", async (req, res) => {
     const result = await queryOne("INSERT INTO role_requests (requester_id, target_user_id, requested_role, club_id, description) VALUES ($1, $2, $3, $4, $5) RETURNING id", [
       requester_id, target_user_id, requested_role, club_id || null, description || null]);
 
-    // Determine who should approve this request and notify them.
-    // For club_president promotions the approver is the council_president for the club's college.
+    // Determine who should approve this request and notify them
     let approverIds: number[] = [];
-    if (requested_role === 'club_president' && club_id) {
-      const clubInfo = await queryOne("SELECT college_code FROM clubs WHERE id = $1", [club_id]);
+    
+    if (requested_role === 'club_president') {
+      // Club president requests go to council president of that college
+      const clubInfo = club_id 
+        ? await queryOne("SELECT college_code FROM clubs WHERE id = $1", [club_id])
+        : { college_code: targetUser.college_name };
+      
       if (clubInfo && clubInfo.college_code) {
-        const approvers = await query("SELECT id, email, full_name FROM users WHERE role = 'council_president' AND LOWER(college_name) = LOWER($1)", [clubInfo.college_code]);
+        const approvers = await query(
+          "SELECT id, email, full_name FROM users WHERE role = 'council_president' AND LOWER(college_name) = LOWER($1)", 
+          [clubInfo.college_code]
+        );
         approverIds = approvers.map((a: any) => a.id);
+        
+        const presenterName = isUserInitiated ? targetUser.full_name : requester.full_name;
         for (const ap of approvers) {
           await execute("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [
             ap.id,
-            `Approval requested: promote ${targetUser.full_name} to club president for ${clubInfo.college_code}`,
+            `${isUserInitiated ? 'Request' : 'Approval requested'}: ${presenterName} wants to be Club President`,
             'role_request',
             `/role-requests/${result.id}`
           ]);
           if (ap.email) {
             try {
+              const emailBody = isUserInitiated 
+                ? `<p>${presenterName} has requested to become a Club President in your college. Please review and approve or reject the request in Festora.</p>`
+                : `<p>${requester.full_name} has requested that <strong>${targetUser.full_name}</strong> be made Club President. Please review and approve or reject the request in Festora.</p>`;
+              
               await emailTransporter.sendMail({
                 from: process.env.EMAIL_FROM,
                 to: ap.email,
-                subject: `Approval needed: Club President request for ${targetUser.full_name}`,
-                html: `<p>Hi ${ap.full_name},</p><p>${requester.full_name} has requested that <strong>${targetUser.full_name}</strong> be made Club President for a club in your college (${clubInfo.college_code}). Please review and approve or reject the request in Festora.</p>`
+                subject: `Club President Request from ${presenterName}`,
+                html: `<p>Hi ${ap.full_name},</p>${emailBody}<p>Best regards,<br>Festora Team</p>`
               });
             } catch (emailError) {
               console.error('Failed to send approver email:', emailError);
@@ -1488,8 +1514,37 @@ app.post("/api/role-requests", async (req, res) => {
           }
         }
       }
-    } else {
-      // For other promotions notify the requester (fallback) and the target user
+    } else if (requested_role === 'club_member') {
+      // Club member requests go to the club's president
+      if (club_id) {
+        const club = await queryOne("SELECT president_id FROM clubs WHERE id = $1", [club_id]);
+        if (club && club.president_id) {
+          const president = await queryOne("SELECT id, email, full_name FROM users WHERE id = $1", [club.president_id]);
+          if (president) {
+            approverIds = [president.id];
+            await execute("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [
+              president.id,
+              `${isUserInitiated ? 'Request' : 'Request to add'}: ${targetUser.full_name} wants to join your club`,
+              'role_request',
+              `/role-requests/${result.id}`
+            ]);
+            if (president.email) {
+              try {
+                await emailTransporter.sendMail({
+                  from: process.env.EMAIL_FROM,
+                  to: president.email,
+                  subject: `Club Member Request from ${targetUser.full_name}`,
+                  html: `<p>Hi ${president.full_name},</p><p>${targetUser.full_name} has requested to join your club. Please review and approve or reject the request in Festora.</p><p>Best regards,<br>Festora Team</p>`
+                });
+              } catch (emailError) {
+                console.error('Failed to send approval email:', emailError);
+              }
+            }
+          }
+        }
+      }
+    } else if (!isUserInitiated) {
+      // Other authority-initiated promotions
       await execute("INSERT INTO notifications (user_id, content, type, link) VALUES ($1, $2, $3, $4)", [
         requester_id,
         `New promotion request for ${requested_role.replace('_',' ')}`,
@@ -1498,8 +1553,10 @@ app.post("/api/role-requests", async (req, res) => {
       ]);
     }
 
-    // Notify target user that a request was created (so they can approve/reject if applicable)
-    if (targetUser.email) {
+    // Notify target user about the request
+    if (targetUser.email && isUserInitiated) {
+      // Skip email for user-initiated (they already know they requested)
+    } else if (targetUser.email && !isUserInitiated) {
       try {
         const roleDetail = requested_role === 'club_president' ? 'Club President' : requested_role.replace('_', ' ');
         await emailTransporter.sendMail({
@@ -1511,7 +1568,7 @@ app.post("/api/role-requests", async (req, res) => {
               <h2 style="color: #6366f1;">Role Promotion Request</h2>
               <p>Hi ${targetUser.full_name},</p>
               <p><strong>${requester.full_name}</strong> has initiated a promotion request for the role of <strong>${roleDetail}</strong>.</p>
-              <p>Please log in to your Festora account to approve or see the status of this request.</p>
+              <p>Please log in to your Festora account to see the status of this request.</p>
               <p>Best regards,<br>Festora Team</p>
             </div>
           `
@@ -1521,7 +1578,7 @@ app.post("/api/role-requests", async (req, res) => {
       }
     }
 
-    res.json({ id: result.id, message: "Promotion request sent", approverIds });
+    res.json({ id: result.id, message: "Request submitted", approverIds });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

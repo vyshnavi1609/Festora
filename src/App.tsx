@@ -2637,37 +2637,27 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
   };
 
 
-  const sendRoleRequest = async (targetId: number, role: Role) => {
+  const sendRoleRequest = async (clubId: number, role: Role) => {
     /*
-      semantically, the role-requests API expects the *requester* to be the user who has the
-      authority to promote someone, and the *target_user_id* to be the account whose role
-      should change.
-      The profile page previously treated the viewer as the requester, which worked for
-      admin/dashboard flows but not when a student tries to "request" membership from a
-      club president.  In that case the president is the one with authority, so we need to
-      flip the ids and also supply the club_id.
+      User-initiated role requests:
+      - Student requests club_member: goes to that club's president for approval
+      - Student/club_member requests club_president: goes to college council_president for approval
     */
     try {
-      // president-level requests should include a short explanation
       let description = '';
-      if (role === 'club_president' || role === 'council_president') {
-        description = prompt('Please describe your plans if granted this role:') || '';
-        if (description === null) return; // cancelled
+      if (role === 'club_president') {
+        description = prompt('Why would you like to become a club president? (optional):') || '';
       }
 
-      let body: any = { requester_id: user.id, target_user_id: targetId, requested_role: role, description };
+      const body: any = { 
+        requester_id: user.id,  // Current user making the request
+        target_user_id: user.id,  // Same user being promoted
+        requested_role: role, 
+        description 
+      };
 
-      // if the viewer is not an authority and is asking to become a club_member, club_president, or council_president,
-      // assume they are requesting a role from a president/council by clicking on their profile.
-      // swap requester/target and include the clubId if we know it.
-      if ((role === 'club_member' || role === 'club_president' || role === 'council_president') && ['student', 'club_member'].includes(user.role)) {
-        // the `targetId` passed here is actually the profile being viewed (president/council)
-        body.requester_id = targetId;
-        body.target_user_id = user.id;
-        if (role === 'club_president' && profileClubs.length > 0) {
-          // take the first club for simplicity; presidents typically lead one club
-          body.club_id = profileClubs[0].id;
-        }
+      if (role === 'club_member' || (role === 'club_president' && clubId)) {
+        body.club_id = clubId;
       }
 
       const res = await fetch('/api/role-requests', {
@@ -2675,6 +2665,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       });
+
       if (!res.ok) {
         const errText = await res.text();
         throw new Error(`status ${res.status} ${errText}`);
@@ -2939,17 +2930,19 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
               </div>
               {targetUser?.role === 'club_president' && (
                 <>
+                  {profileClubs.length > 0 ? (
+                    <button 
+                      onClick={() => sendRoleRequest(profileClubs[0].id, 'club_member')}
+                      className="flex-1 bg-rose-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all border border-rose-100 active:scale-95"
+                    >
+                      Request Membership
+                    </button>
+                  ) : null}
                   <button 
-                    onClick={() => sendRoleRequest(targetUser.id, 'club_member')}
-                    className="flex-1 bg-rose-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all border border-rose-100 active:scale-95"
-                  >
-                    Request Membership
-                  </button>
-                  <button 
-                    onClick={() => sendRoleRequest(targetUser.id, 'club_president')}
+                    onClick={() => sendRoleRequest(0, 'club_president')}
                     className="flex-1 bg-amber-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-100 transition-all border border-amber-100 active:scale-95"
                   >
-                    Request Role
+                    Request Club President Role
                   </button>
                 </>
               )}
