@@ -2955,6 +2955,14 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                       🎯 Request to Join Club
                     </button>
                   )}
+                  {profileClubs.length === 0 && (
+                    <button 
+                      disabled
+                      className="w-full bg-zinc-100 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-zinc-400 border border-zinc-200"
+                    >
+                      🎯 No Clubs Available
+                    </button>
+                  )}
                 </>
               )}
               {targetUser?.role === 'council_president' && user.id !== targetUser?.id && user.role !== 'admin' && user.role !== 'council_president' && user.role !== 'club_president' && (
