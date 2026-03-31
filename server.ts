@@ -2588,8 +2588,21 @@ if (process.env.NODE_ENV === "production") {
   });
 }
 
-// Start server LAST
-const PORT = parseInt(process.env.PORT || '5000', 10);
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Festora server running on port ${PORT}`);
-});
+// Start server LAST - Wait for database initialization first
+async function startServer() {
+  try {
+    console.log('🔄 Initializing database...');
+    await initializeDatabase();
+    console.log('✅ Database initialized successfully');
+    
+    const PORT = parseInt(process.env.PORT || '5000', 10);
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Festora server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('❌ Failed to start server:', error);
+    process.exit(1);
+  }
+}
+
+startServer();
