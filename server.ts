@@ -368,12 +368,6 @@ async function initializeDatabase() {
   }
 }
 
-// Initialize database on startup (async, non-blocking)
-initializeDatabase().catch(err => {
-  console.error('Database initialization failed, but server will continue:', err.message);
-});
-
-
 // Cleanup expired stories periodically  
 setInterval(async () => {
   try {
