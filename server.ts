@@ -365,6 +365,7 @@ async function initializeDatabase() {
     console.log('Database schema initialized successfully');
   } catch (err) {
     console.error('Database initialization error:', err);
+    throw err; // Re-throw so startServer knows initialization failed
   }
 }
 
