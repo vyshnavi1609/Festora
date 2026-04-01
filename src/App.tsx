@@ -5500,7 +5500,10 @@ export default function App() {
       const raw = localStorage.getItem('festora_user');
       if (raw) {
         const storedUser = JSON.parse(raw);
-        // Verify that the user still exists in the database
+        // Set user immediately so they stay logged in during refresh
+        setUser(storedUser);
+        
+        // Verify in the background that the user still exists in the database
         fetch(`/api/users/${storedUser.id}`)
           .then(res => {
             if (res.status === 404) {
@@ -5509,14 +5512,14 @@ export default function App() {
               setUser(null);
             } else if (res.ok) {
               return res.json().then(currentUser => {
-                // User exists, set them as logged in
+                // Update with latest data from server
                 setUser(currentUser);
               });
             }
           })
           .catch(() => {
-            // If we can't verify, restore the stored user anyway
-            setUser(storedUser);
+            // If we can't verify, keep the stored user
+            // User stays logged in
           });
       }
     } catch (e) { /* ignore */ }
