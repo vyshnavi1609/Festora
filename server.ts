@@ -98,6 +98,81 @@ async function initializeDatabase() {
       )
     `);
 
+    // Create clubs BEFORE role_requests since role_requests references clubs via foreign key
+    await execute(`
+      CREATE TABLE IF NOT EXISTS clubs (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255),
+        description TEXT,
+        logo_url TEXT,
+        president_id INTEGER,
+        created_by INTEGER,
+        college_code VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(name, college_code),
+        FOREIGN KEY(president_id) REFERENCES users(id),
+        FOREIGN KEY(created_by) REFERENCES users(id)
+      )
+    `);
+
+    await execute(`
+      CREATE TABLE IF NOT EXISTS club_members (
+        id SERIAL PRIMARY KEY,
+        club_id INTEGER,
+        user_id INTEGER,
+        role VARCHAR(50) DEFAULT 'member',
+        joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(club_id, user_id),
+        FOREIGN KEY(club_id) REFERENCES clubs(id),
+        FOREIGN KEY(user_id) REFERENCES users(id)
+      )
+    `);
+
+    await execute(`
+      CREATE TABLE IF NOT EXISTS club_follows (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER,
+        club_id INTEGER,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id),
+        FOREIGN KEY(club_id) REFERENCES clubs(id),
+        UNIQUE(user_id, club_id)
+      )
+    `);
+
+    await execute(`
+      CREATE TABLE IF NOT EXISTS club_posts (
+        id SERIAL PRIMARY KEY,
+        club_id INTEGER,
+        user_id INTEGER,
+        content TEXT,
+        image_url TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(club_id) REFERENCES clubs(id),
+        FOREIGN KEY(user_id) REFERENCES users(id)
+      )
+    `);
+
+    await execute(`
+      CREATE TABLE IF NOT EXISTS club_requests (
+        id SERIAL PRIMARY KEY,
+        requester_id INTEGER,
+        club_name VARCHAR(255),
+        club_description TEXT,
+        club_image_url TEXT,
+        in_charge_name VARCHAR(255),
+        in_charge_email VARCHAR(255),
+        related_to TEXT,
+        college_code VARCHAR(50),
+        status VARCHAR(50) DEFAULT 'pending',
+        requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        reviewed_at TIMESTAMP,
+        reviewed_by INTEGER,
+        FOREIGN KEY(requester_id) REFERENCES users(id),
+        FOREIGN KEY(reviewed_by) REFERENCES users(id)
+      )
+    `);
+
     await execute(`
       CREATE TABLE IF NOT EXISTS role_requests (
         id SERIAL PRIMARY KEY,
@@ -285,80 +360,6 @@ async function initializeDatabase() {
         used INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(user_id) REFERENCES users(id)
-      )
-    `);
-
-    await execute(`
-      CREATE TABLE IF NOT EXISTS clubs (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255),
-        description TEXT,
-        logo_url TEXT,
-        president_id INTEGER,
-        created_by INTEGER,
-        college_code VARCHAR(50),
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(name, college_code),
-        FOREIGN KEY(president_id) REFERENCES users(id),
-        FOREIGN KEY(created_by) REFERENCES users(id)
-      )
-    `);
-
-    await execute(`
-      CREATE TABLE IF NOT EXISTS club_members (
-        id SERIAL PRIMARY KEY,
-        club_id INTEGER,
-        user_id INTEGER,
-        role VARCHAR(50) DEFAULT 'member',
-        joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(club_id, user_id),
-        FOREIGN KEY(club_id) REFERENCES clubs(id),
-        FOREIGN KEY(user_id) REFERENCES users(id)
-      )
-    `);
-
-    await execute(`
-      CREATE TABLE IF NOT EXISTS club_follows (
-        id SERIAL PRIMARY KEY,
-        user_id INTEGER,
-        club_id INTEGER,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(user_id) REFERENCES users(id),
-        FOREIGN KEY(club_id) REFERENCES clubs(id),
-        UNIQUE(user_id, club_id)
-      )
-    `);
-
-    await execute(`
-      CREATE TABLE IF NOT EXISTS club_posts (
-        id SERIAL PRIMARY KEY,
-        club_id INTEGER,
-        user_id INTEGER,
-        content TEXT,
-        image_url TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(club_id) REFERENCES clubs(id),
-        FOREIGN KEY(user_id) REFERENCES users(id)
-      )
-    `);
-
-    await execute(`
-      CREATE TABLE IF NOT EXISTS club_requests (
-        id SERIAL PRIMARY KEY,
-        requester_id INTEGER,
-        club_name VARCHAR(255),
-        club_description TEXT,
-        club_image_url TEXT,
-        in_charge_name VARCHAR(255),
-        in_charge_email VARCHAR(255),
-        related_to TEXT,
-        college_code VARCHAR(50),
-        status VARCHAR(50) DEFAULT 'pending',
-        requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        reviewed_at TIMESTAMP,
-        reviewed_by INTEGER,
-        FOREIGN KEY(requester_id) REFERENCES users(id),
-        FOREIGN KEY(reviewed_by) REFERENCES users(id)
       )
     `);
 
