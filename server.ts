@@ -377,6 +377,24 @@ async function initializeDatabase() {
         ON CONFLICT DO NOTHING
       `);
       
+      // Insert mock clubs
+      await execute(`
+        INSERT INTO clubs (id, name, description, president_id, created_by, college_code)
+        VALUES 
+          (1, 'Tech Club', 'For all tech enthusiasts', 2, 2, 'GNITS'),
+          (2, 'Cultural Club', 'Celebrating diverse cultures', 2, 2, 'GNITS')
+        ON CONFLICT DO NOTHING
+      `);
+      
+      // Add Bob to club_members as president
+      await execute(`
+        INSERT INTO club_members (club_id, user_id, role)
+        VALUES 
+          (1, 2, 'president'),
+          (2, 2, 'president')
+        ON CONFLICT DO NOTHING
+      `);
+      
       // Insert mock events
       const futureDate = new Date(Date.now() + 86400000).toISOString();
       const futureDatePlus3 = new Date(Date.now() + 3*86400000).toISOString();
