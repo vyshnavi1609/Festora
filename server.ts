@@ -363,6 +363,42 @@ async function initializeDatabase() {
       )
     `);
 
+    // Seed mock data if no users exist yet
+    const userCount = await queryOne("SELECT COUNT(*) as count FROM users", []);
+    if (!userCount?.count || userCount.count === 0) {
+      console.log('🌱 Seeding mock data...');
+      
+      // Insert mock users
+      await execute(`
+        INSERT INTO users (id, username, email, full_name, role, college_name, avatar_url)
+        VALUES 
+          (1, 'alice', 'alice@example.com', 'Alice Johnson', 'student', 'GNITS', ''),
+          (2, 'bob', 'bob@example.com', 'Bob Kumar', 'club_president', 'GNITS', '')
+        ON CONFLICT DO NOTHING
+      `);
+      
+      // Insert mock events
+      const futureDate = new Date(Date.now() + 86400000).toISOString();
+      const futureDatePlus3 = new Date(Date.now() + 3*86400000).toISOString();
+      
+      await execute(`
+        INSERT INTO events (id, title, description, image_url, date, location, category, created_by, college_code, capacity, privacy)
+        VALUES 
+          (101, 'Freshers Social Night', 'Welcome party with music and food', 'https://picsum.photos/seed/101/800/600', $1, 'Main Auditorium', 'Social', 2, 'GNITS', 200, 'social'),
+          (102, 'Workshop: Intro to React', 'Hands-on React workshop', 'https://picsum.photos/seed/102/800/600', $2, 'Lab 3', 'Workshop', 2, 'GNITS', 50, 'social')
+        ON CONFLICT DO NOTHING
+      `, [futureDate, futureDatePlus3]);
+      
+      // Insert mock registrations
+      await execute(`
+        INSERT INTO registrations (user_id, event_id, status)
+        VALUES (1, 101, 'registered')
+        ON CONFLICT DO NOTHING
+      `);
+      
+      console.log('✅ Mock data seeded successfully');
+    }
+
     console.log('Database schema initialized successfully');
   } catch (err) {
     console.error('Database initialization error:', err);
