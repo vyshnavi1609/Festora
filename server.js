@@ -776,7 +776,7 @@ app.get("/api/users/:id/clubs", async (req, res) => {
       SELECT DISTINCT c.*
       FROM clubs c
       LEFT JOIN club_members cm ON c.id = cm.club_id
-      WHERE c.president_id = $1 OR (cm.user_id = $1 AND cm.role = 'president')
+      WHERE c.president_id = $1 OR cm.user_id = $1
     `, [req.params.id]);
     res.json(clubs);
 });

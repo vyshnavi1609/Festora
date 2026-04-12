@@ -892,7 +892,12 @@ app.get("/api/clubs/:id/followers-count", async (req, res) => {
 });
 
 app.get("/api/users/:id/clubs", async (req, res) => {
-  const clubs = await query("SELECT c.* FROM clubs c JOIN club_members cm ON c.id = cm.club_id WHERE cm.user_id = $1", [req.params.id]);
+  const clubs = await query(`
+    SELECT DISTINCT c.*
+    FROM clubs c
+    LEFT JOIN club_members cm ON c.id = cm.club_id
+    WHERE c.president_id = $1 OR cm.user_id = $1
+  `, [req.params.id]);
   res.json(clubs);
 });
 
