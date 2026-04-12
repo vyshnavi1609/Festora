@@ -2540,7 +2540,7 @@ const ActivityView = ({ user, onViewProfile }: { user: User, onViewProfile: (id:
   );
 };
 
-const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewProfile, suggestions, onFollowSuggestion, refreshSuggestions, onNavigateCreate }: { user: User, targetUserId?: number, onLogout: () => void, onUpdate: (u: User) => void, onBack?: () => void, onViewProfile: (id: number) => void, suggestions?: User[], onFollowSuggestion?: (id: number) => void, refreshSuggestions?: () => void, onNavigateCreate?: () => void }) => {
+const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewProfile, suggestions, onFollowSuggestion, refreshSuggestions, onNavigateCreate, setToast }: { user: User, targetUserId?: number, onLogout: () => void, onUpdate: (u: User) => void, onBack?: () => void, onViewProfile: (id: number) => void, suggestions?: User[], onFollowSuggestion?: (id: number) => void, refreshSuggestions?: () => void, onNavigateCreate?: () => void, setToast?: (toast: { message: string, type: 'success' | 'error' }) => void }) => {
   const [targetUser, setTargetUser] = useState<User | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [savedEvents, setSavedEvents] = useState<Event[]>([]);
@@ -2716,10 +2716,10 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
         const errText = await res.text();
         throw new Error(`status ${res.status} ${errText}`);
       }
-      alert('Role request sent!');
+      setToast?.({ message: 'Role request sent!', type: 'success' });
     } catch (err) {
       console.error('failed to send role request', err);
-      alert('Unable to send request');
+      setToast?.({ message: 'Unable to send request', type: 'error' });
     }
   };
 
@@ -2737,14 +2737,14 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
         const errText = await res.text();
         throw new Error(`status ${res.status} ${errText}`);
       }
-      alert('User promoted to Council President!');
+      setToast?.({ message: 'User promoted to Council President!', type: 'success' });
       // Refresh profile view
       if (targetUserId) {
         onViewProfile(targetUserId);
       }
     } catch (err) {
       console.error('failed to promote user', err);
-      alert('Unable to promote user');
+      setToast?.({ message: 'Unable to promote user', type: 'error' });
     }
   };
 
@@ -2777,7 +2777,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
         await navigator.share(shareData);
       } else {
         await navigator.clipboard.writeText(shareData.url);
-        alert('Profile link copied to clipboard!');
+        setToast?.({ message: 'Profile link copied to clipboard!', type: 'success' });
       }
     } catch (err) {
       console.error('Error sharing:', err);
@@ -3126,15 +3126,15 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                         })
                       });
                       if (res.ok) {
-                        alert('Club membership request sent!');
+                        setToast?.({ message: 'Club membership request sent!', type: 'success' });
                         setShowClubMemberRequestModal(false);
                         setClubMemberRequestData({ reason: '' });
                       } else {
                         const error = await res.json();
-                        alert('Error: ' + error.error);
+                        setToast?.({ message: error.error || 'Error sending request', type: 'error' });
                       }
                     } catch (err) {
-                      alert('Failed to send request');
+                      setToast?.({ message: 'Failed to send request', type: 'error' });
                     }
                   }}
                   className="flex-1 bg-rose-600 text-white py-3.5 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-700 transition-all active:scale-95"
@@ -3208,7 +3208,7 @@ const AnalyticsView = ({ user }: { user: User }) => {
   );
 };
 
-const AdminDashboard = ({ user }: { user: User }) => {
+const AdminDashboard = ({ user, setToast }: { user: User, setToast?: (toast: { message: string, type: 'success' | 'error' }) => void }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [requests, setRequests] = useState<RoleRequest[]>([]);
   const [globalStats, setGlobalStats] = useState<any>(null);
@@ -3260,7 +3260,7 @@ const AdminDashboard = ({ user }: { user: User }) => {
       if (!res.ok) throw new Error(`status ${res.status}`);
     } catch (err) {
       console.error('error sending role request', err);
-      alert('Unable to send role request');
+      setToast?.({ message: 'Unable to send role request', type: 'error' });
     }
     fetchData();
   };
@@ -3275,7 +3275,7 @@ const AdminDashboard = ({ user }: { user: User }) => {
       if (!res.ok) throw new Error(`status ${res.status}`);
     } catch (err) {
       console.error('approve failed', err);
-      alert('Failed to approve request');
+      setToast?.({ message: 'Failed to approve request', type: 'error' });
     }
     fetchData();
   };
@@ -3290,7 +3290,7 @@ const AdminDashboard = ({ user }: { user: User }) => {
       if (!res.ok) throw new Error(`status ${res.status}`);
     } catch (err) {
       console.error('reject failed', err);
-      alert('Failed to reject request');
+      setToast?.({ message: 'Failed to reject request', type: 'error' });
     }
     fetchData();
   };
@@ -4905,7 +4905,7 @@ const ClubRequestModal = ({ user, isOpen, onClose, onSubmit }: { user: User, isO
 };
 
 // Role Requests View (for Council President)
-const RoleRequestsView = ({ user, onBack }: { user: User, onBack?: () => void }) => {
+const RoleRequestsView = ({ user, onBack, setToast }: { user: User, onBack?: () => void, setToast?: (toast: { message: string, type: 'success' | 'error' }) => void }) => {
   const [requests, setRequests] = useState<any[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -4934,15 +4934,16 @@ const RoleRequestsView = ({ user, onBack }: { user: User, onBack?: () => void })
         body: JSON.stringify({ requestId, approver_id: user.id })
       });
       if (res.ok) {
-        alert('Role request approved!');
+        setToast?.({ message: 'Role request approved!', type: 'success' });
         setSelectedRequest(null);
         fetchRoleRequests();
       } else {
-        alert('Failed to approve request');
+        const error = await res.json();
+        setToast?.({ message: error.error || 'Failed to approve request', type: 'error' });
       }
     } catch (err) {
       console.error(err);
-      alert('Error approving request');
+      setToast?.({ message: 'Error approving request', type: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -4960,12 +4961,16 @@ const RoleRequestsView = ({ user, onBack }: { user: User, onBack?: () => void })
         body: JSON.stringify({ requestId, approver_id: user.id })
       });
       if (res.ok) {
-        alert('Request rejected');
+        setToast?.({ message: 'Request rejected', type: 'success' });
         setSelectedRequest(null);
         fetchRoleRequests();
+      } else {
+        const error = await res.json();
+        setToast?.({ message: error.error || 'Failed to reject request', type: 'error' });
       }
     } catch (err) {
       console.error(err);
+      setToast?.({ message: 'Error rejecting request', type: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -4989,14 +4994,14 @@ const RoleRequestsView = ({ user, onBack }: { user: User, onBack?: () => void })
             <button
               onClick={() => handleApprove(selectedRequest.id)}
               disabled={isLoading}
-              className="flex-1 bg-emerald-600 text-white py-3 rounded-2xl font-black text-sm hover:bg-emerald-700 disabled:opacity-50 active:scale-95"
+              className="flex-1 bg-emerald-600 text-white py-3 rounded-2xl font-black text-sm hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
             >
               {isLoading ? 'Processing...' : 'Approve'}
             </button>
             <button
               onClick={() => handleReject(selectedRequest.id)}
               disabled={isLoading}
-              className="flex-1 bg-red-600 text-white py-3 rounded-2xl font-black text-sm hover:bg-red-700 disabled:opacity-50 active:scale-95"
+              className="flex-1 bg-red-600 text-white py-3 rounded-2xl font-black text-sm hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
             >
               {isLoading ? 'Processing...' : 'Reject'}
             </button>
@@ -5038,7 +5043,7 @@ const RoleRequestsView = ({ user, onBack }: { user: User, onBack?: () => void })
 };
 
 // Single Role Request Detail View
-const RoleRequestDetailView = ({ id, user, onBack }: { id: number, user: User, onBack: () => void }) => {
+const RoleRequestDetailView = ({ id, user, onBack, setToast }: { id: number, user: User, onBack: () => void, setToast?: (toast: { message: string, type: 'success' | 'error' }) => void }) => {
   const [request, setRequest] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -5058,14 +5063,14 @@ const RoleRequestDetailView = ({ id, user, onBack }: { id: number, user: User, o
         body: JSON.stringify({ requestId: id, approver_id: user.id })
       });
       if (res.ok) {
-        alert('Request approved!');
+        setToast?.({ message: 'Request approved!', type: 'success' });
         onBack();
       } else {
         const error = await res.json();
-        alert('Error: ' + error.error);
+        setToast?.({ message: error.error || 'Failed to approve request', type: 'error' });
       }
     } catch (err) {
-      alert('Failed to approve request');
+      setToast?.({ message: 'Failed to approve request', type: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -5080,14 +5085,14 @@ const RoleRequestDetailView = ({ id, user, onBack }: { id: number, user: User, o
         body: JSON.stringify({ requestId: id, approver_id: user.id })
       });
       if (res.ok) {
-        alert('Request rejected!');
+        setToast?.({ message: 'Request rejected!', type: 'success' });
         onBack();
       } else {
         const error = await res.json();
-        alert('Error: ' + error.error);
+        setToast?.({ message: error.error || 'Failed to reject request', type: 'error' });
       }
     } catch (err) {
-      alert('Failed to reject request');
+      setToast?.({ message: 'Failed to reject request', type: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -5138,16 +5143,16 @@ const RoleRequestDetailView = ({ id, user, onBack }: { id: number, user: User, o
             <button 
               onClick={handleReject}
               disabled={isLoading}
-              className="flex-1 bg-red-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all border border-red-100 active:scale-95 disabled:opacity-50"
+              className="flex-1 bg-red-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-100 transition-all border border-red-100 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Reject
+              {isLoading ? 'Rejecting...' : 'Reject'}
             </button>
             <button 
               onClick={handleApprove}
               disabled={isLoading}
-              className="flex-1 bg-green-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-green-100 transition-all border border-green-100 active:scale-95 disabled:opacity-50"
+              className="flex-1 bg-green-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-green-100 transition-all border border-green-100 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Approve
+              {isLoading ? 'Approving...' : 'Approve'}
             </button>
           </div>
         </div>
@@ -5157,7 +5162,7 @@ const RoleRequestDetailView = ({ id, user, onBack }: { id: number, user: User, o
 };
 
 // Club Requests Admin View (for Council President)
-const ClubRequestsView = ({ user, onBack }: { user: User, onBack?: () => void }) => {
+const ClubRequestsView = ({ user, onBack, setToast }: { user: User, onBack?: () => void, setToast?: (toast: { message: string, type: 'success' | 'error' }) => void }) => {
   const [requests, setRequests] = useState<any[]>([]);
   const [selectedRequest, setSelectedRequest] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -5183,15 +5188,16 @@ const ClubRequestsView = ({ user, onBack }: { user: User, onBack?: () => void })
         body: JSON.stringify({ reviewedBy: user.id })
       });
       if (res.ok) {
-        alert('Club approved and created!');
+        setToast?.({ message: 'Club approved and created!', type: 'success' });
         setSelectedRequest(null);
         fetchClubRequests();
       } else {
-        alert('Failed to approve request');
+        const error = await res.json();
+        setToast?.({ message: error.error || 'Failed to approve request', type: 'error' });
       }
     } catch (err) {
       console.error(err);
-      alert('Error approving request');
+      setToast?.({ message: 'Error approving request', type: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -5209,12 +5215,16 @@ const ClubRequestsView = ({ user, onBack }: { user: User, onBack?: () => void })
         body: JSON.stringify({ reviewedBy: user.id, reason })
       });
       if (res.ok) {
-        alert('Request rejected');
+        setToast?.({ message: 'Request rejected', type: 'success' });
         setSelectedRequest(null);
         fetchClubRequests();
+      } else {
+        const error = await res.json();
+        setToast?.({ message: error.error || 'Failed to reject request', type: 'error' });
       }
     } catch (err) {
       console.error(err);
+      setToast?.({ message: 'Error rejecting request', type: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -5253,16 +5263,16 @@ const ClubRequestsView = ({ user, onBack }: { user: User, onBack?: () => void })
             <button 
               onClick={() => handleApprove(selectedRequest.id)}
               disabled={isLoading}
-              className="flex-1 bg-emerald-600 text-white font-black text-sm py-3 rounded-2xl hover:bg-emerald-700 transition-all"
+              className="flex-1 bg-emerald-600 text-white font-black text-sm py-3 rounded-2xl hover:bg-emerald-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Approve
+              {isLoading ? 'Approving...' : 'Approve'}
             </button>
             <button 
               onClick={() => handleReject(selectedRequest.id)}
               disabled={isLoading}
-              className="flex-1 bg-rose-100 text-rose-600 font-black text-sm py-3 rounded-2xl hover:bg-rose-200 transition-all"
+              className="flex-1 bg-rose-100 text-rose-600 font-black text-sm py-3 rounded-2xl hover:bg-rose-200 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Reject
+              {isLoading ? 'Rejecting...' : 'Reject'}
             </button>
           </div>
         </div>
@@ -5907,9 +5917,10 @@ export default function App() {
                 onFollowSuggestion={handleFollowSuggestion}
                 refreshSuggestions={fetchSuggestions}
                 onNavigateCreate={() => setActiveTab('create')}
+                setToast={setToast}
               />
               {['admin', 'council_president', 'club_president'].includes(user.role) && !viewingProfileId && (
-                <AdminDashboard user={user} />
+                <AdminDashboard user={user} setToast={setToast} />
               )}
             </div>
           )}
@@ -5917,12 +5928,13 @@ export default function App() {
             <RoleRequestDetailView 
               id={viewingRoleRequestId} 
               user={user} 
-              onBack={() => { setViewingRoleRequestId(null); setActiveTab('home'); }} 
+              onBack={() => { setViewingRoleRequestId(null); setActiveTab('home'); }}
+              setToast={setToast}
             />
           )}
           {activeTab === 'settings' && <SettingsView user={user} onLogout={() => setUser(null)} onBack={() => setActiveTab(previousTab)} setActiveTab={setActiveTab} onOpenClubRequest={() => setShowClubRequestModal(true)} />}
-          {activeTab === 'club-requests' && user.role === 'council_president' && <ClubRequestsView user={user} onBack={() => setActiveTab(previousTab)} />}
-          {activeTab === 'role-requests' && user.role === 'council_president' && <RoleRequestsView user={user} onBack={() => setActiveTab(previousTab)} />}
+          {activeTab === 'club-requests' && user.role === 'council_president' && <ClubRequestsView user={user} onBack={() => setActiveTab(previousTab)} setToast={setToast} />}
+          {activeTab === 'role-requests' && user.role === 'council_president' && <RoleRequestsView user={user} onBack={() => setActiveTab(previousTab)} setToast={setToast} />}
           {activeTab === 'club-management' && user.role === 'club_president' && <ClubManagementView user={user} onBack={() => setActiveTab(previousTab)} />}
         </motion.div>
       </AnimatePresence>
