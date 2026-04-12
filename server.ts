@@ -436,6 +436,38 @@ setInterval(async () => {
   }
 }, 60 * 60 * 1000); // Run every hour
 
+const cleanUpExpiredEvents = async () => {
+  try {
+    const expiredIds = await query("SELECT id FROM events WHERE date::timestamp < NOW()", []);
+    if (!expiredIds.length) return;
+    const ids = expiredIds.map((row) => row.id);
+
+    await execute("BEGIN");
+    try {
+      await execute("DELETE FROM registrations WHERE event_id = ANY($1)", [ids]);
+      await execute("DELETE FROM comments WHERE event_id = ANY($1)", [ids]);
+      await execute("DELETE FROM likes WHERE event_id = ANY($1)", [ids]);
+      await execute("DELETE FROM bookmarks WHERE event_id = ANY($1)", [ids]);
+      await execute("DELETE FROM reminders WHERE event_id = ANY($1)", [ids]);
+      await execute("DELETE FROM event_reminders WHERE event_id = ANY($1)", [ids]);
+      await execute("DELETE FROM events WHERE id = ANY($1)", [ids]);
+      await execute("COMMIT");
+      console.log(`Cleaned up ${ids.length} expired events`);
+    } catch (cleanupError) {
+      await execute("ROLLBACK");
+      throw cleanupError;
+    }
+  } catch (e) {
+    console.error('Error cleaning up expired events:', e);
+  }
+};
+
+// Run cleanup immediately on startup
+(async () => {
+  await cleanUpExpiredEvents();
+})();
+
+setInterval(cleanUpExpiredEvents, 60 * 60 * 1000); // Run every hour
 
 // Express app initialization must come before all route definitions
 const app = express();
@@ -1156,17 +1188,20 @@ app.post("/api/users/:id/profile", async (req, res) => {
 
 // Event Routes
 app.get("/api/events/user/:id/count", async (req, res) => {
+  await cleanUpExpiredEvents();
   const count = await queryOne("SELECT COUNT(*) as count FROM events WHERE created_by = $1", [req.params.id]);
   res.json(count);
 });
 
 app.get("/api/users/:id/events", async (req, res) => {
+  await cleanUpExpiredEvents();
   const events = await query("SELECT * FROM events WHERE created_by = $1 ORDER BY date DESC", [req.params.id]);
   res.json(events);
 });
 
 // Get events, filter private events by college code if provided
 app.get("/api/events", async (req, res) => {
+  await cleanUpExpiredEvents();
   const { college_code } = req.query;
   let events;
   if (college_code) {
@@ -1279,26 +1314,16 @@ app.post("/api/events", async (req, res) => {
       console.warn('Missing created_by field');
       return res.status(400).json({ error: "User ID is required" });
     }
-    
-    // Check if user is a student - students cannot create events
-    const user = await queryOne("SELECT role FROM users WHERE id = $1", [created_by]);
-    if (!user) {
-      return res.status(404).json({ error: "User not found" });
-    }
-    if (user.role === 'student') {
-      return res.status(403).json({ error: "Students cannot create events" });
-    }
-    
-    if (!google_form_url.startsWith('http')) {
-      return res.status(400).json({ error: "Google Form URL must start with http or https" });
+        const eventDate = new Date(date);
+        if (isNaN(eventDate.getTime())) {
+            return res.status(400).json({ error: "Invalid event date" });
+        }
+        const normalizedDate = eventDate.toISOString();
     }
     const eventPrivacy = privacy === 'private' ? 'private' : 'social';
     const eventCollegeCode = eventPrivacy === 'private' ? (college_code || null) : null;
     const result = await queryOne("INSERT INTO events (title, description, image_url, date, location, category, created_by, privacy, college_code, club_id, pass, google_form_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id", [
-      title, description, image_url, date, location, category || 'Social', created_by, eventPrivacy, eventCollegeCode, club_id || null, pass || null, google_form_url || null
-    ]);
-
-    // if the event is for a club, notify its followers
+            title, description, image_url, normalizedDate, location, category || 'Social', created_by, eventPrivacy, eventCollegeCode, club_id || null, pass || null, google_form_url || null
     if (club_id) {
       const club = await queryOne("SELECT name FROM clubs WHERE id = $1", [club_id]);
       const followers = await query("SELECT user_id FROM club_follows WHERE club_id = $1", [club_id]);
@@ -2083,6 +2108,7 @@ app.get("/api/notifications/:userId", async (req, res) => {
 
 // helper to fetch a single event (used for deep-linking)
 app.get("/api/events/:id", async (req, res) => {
+  await cleanUpExpiredEvents();
   const event = await queryOne("SELECT * FROM events WHERE id = $1", [req.params.id]);
   if (event) res.json(event);
   else res.status(404).json({ error: "Event not found" });
