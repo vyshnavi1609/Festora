@@ -1792,32 +1792,49 @@ app.delete("/api/users/:id", async (req, res) => {
         const userId = req.params.id;
         // Only allow self-delete or admin
         const requesterId = req.query.requester || req.headers['x-requester-id'];
+        console.log('Delete user request:', { userId, requesterId });
         let requester = null;
         if (requesterId) {
             requester = await (0, db_js_1.queryOne)("SELECT * FROM users WHERE id = $1", [requesterId]);
+            console.log('Requester found:', requester);
         }
-        if (!requester || (requester.id != userId && requester.role !== 'admin')) {
+        if (!requester) {
+            console.log('No requester found');
             return res.status(403).json({ error: "Not authorized to delete this account" });
         }
-        await (0, db_js_1.execute)("DELETE FROM club_members WHERE user_id = $1", [userId]);
-        await (0, db_js_1.execute)("UPDATE clubs SET president_id = NULL WHERE president_id = $1", [userId]);
-        await (0, db_js_1.execute)("DELETE FROM club_follows WHERE user_id = $1", [userId]);
-        await (0, db_js_1.execute)("DELETE FROM likes WHERE user_id = $1", [userId]);
-        await (0, db_js_1.execute)("DELETE FROM bookmarks WHERE user_id = $1", [userId]);
-        await (0, db_js_1.execute)("DELETE FROM registrations WHERE user_id = $1", [userId]);
-        await (0, db_js_1.execute)("DELETE FROM comments WHERE user_id = $1", [userId]);
-        await (0, db_js_1.execute)("DELETE FROM follows WHERE follower_id = $1 OR following_id = $2", [userId, userId]);
-        await (0, db_js_1.execute)("DELETE FROM messages WHERE sender_id = $1 OR receiver_id = $2", [userId, userId]);
-        await (0, db_js_1.execute)("DELETE FROM notifications WHERE user_id = $1", [userId]);
-        await (0, db_js_1.execute)("DELETE FROM reminders WHERE user_id = $1", [userId]);
-        await (0, db_js_1.execute)("DELETE FROM event_reminders WHERE user_id = $1", [userId]);
-        await (0, db_js_1.execute)("DELETE FROM saved_events WHERE user_id = $1", [userId]);
-        await (0, db_js_1.execute)("DELETE FROM story_views WHERE viewer_id = $1", [userId]);
-        await (0, db_js_1.execute)("DELETE FROM stories WHERE user_id = $1", [userId]);
-        await (0, db_js_1.execute)("DELETE FROM activity WHERE user_id = $1 OR target_user_id = $2", [userId, userId]);
-        await (0, db_js_1.execute)("DELETE FROM role_requests WHERE requester_id = $1 OR target_user_id = $2", [userId, userId]);
-        await (0, db_js_1.execute)("DELETE FROM password_reset_tokens WHERE user_id = $1", [userId]);
-        await (0, db_js_1.execute)("DELETE FROM users WHERE id = $1", [userId]);
+        if (requester.id != userId && requester.role !== 'admin') {
+            console.log('Requester not authorized:', { requesterId: requester.id, requesterRole: requester.role, targetId: userId });
+            return res.status(403).json({ error: "Not authorized to delete this account" });
+        }
+        // Start transaction
+        await (0, db_js_1.execute)("BEGIN");
+        try {
+            await (0, db_js_1.execute)("DELETE FROM club_members WHERE user_id = $1", [userId]);
+            await (0, db_js_1.execute)("UPDATE clubs SET president_id = NULL WHERE president_id = $1", [userId]);
+            await (0, db_js_1.execute)("DELETE FROM club_follows WHERE user_id = $1", [userId]);
+            await (0, db_js_1.execute)("DELETE FROM likes WHERE user_id = $1", [userId]);
+            await (0, db_js_1.execute)("DELETE FROM bookmarks WHERE user_id = $1", [userId]);
+            await (0, db_js_1.execute)("DELETE FROM registrations WHERE user_id = $1", [userId]);
+            await (0, db_js_1.execute)("DELETE FROM comments WHERE user_id = $1", [userId]);
+            await (0, db_js_1.execute)("DELETE FROM follows WHERE follower_id = $1 OR following_id = $2", [userId, userId]);
+            await (0, db_js_1.execute)("DELETE FROM messages WHERE sender_id = $1 OR receiver_id = $2", [userId, userId]);
+            await (0, db_js_1.execute)("DELETE FROM notifications WHERE user_id = $1", [userId]);
+            await (0, db_js_1.execute)("DELETE FROM reminders WHERE user_id = $1", [userId]);
+            await (0, db_js_1.execute)("DELETE FROM event_reminders WHERE user_id = $1", [userId]);
+            await (0, db_js_1.execute)("DELETE FROM saved_events WHERE user_id = $1", [userId]);
+            await (0, db_js_1.execute)("DELETE FROM story_views WHERE viewer_id = $1", [userId]);
+            await (0, db_js_1.execute)("DELETE FROM stories WHERE user_id = $1", [userId]);
+            await (0, db_js_1.execute)("DELETE FROM activity WHERE user_id = $1 OR target_user_id = $2", [userId, userId]);
+            await (0, db_js_1.execute)("DELETE FROM role_requests WHERE requester_id = $1 OR target_user_id = $2", [userId, userId]);
+            await (0, db_js_1.execute)("DELETE FROM password_reset_tokens WHERE user_id = $1", [userId]);
+            await (0, db_js_1.execute)("DELETE FROM users WHERE id = $1", [userId]);
+            // Commit transaction
+            await (0, db_js_1.execute)("COMMIT");
+        } catch (deleteError) {
+            // Rollback on error
+            await (0, db_js_1.execute)("ROLLBACK");
+            throw deleteError;
+        }
         res.json({ success: true });
     }
     catch (e) {

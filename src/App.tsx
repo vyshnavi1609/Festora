@@ -3243,7 +3243,10 @@ const AdminDashboard = ({ user, setToast }: { user: User, setToast?: (toast: { m
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { 
+    console.log('AdminDashboard user:', { id: user.id, role: user.role, full_name: user.full_name });
+    fetchData(); 
+  }, []);
 
   const handleRequestRole = async (targetId: number, role: Role) => {
     try {
@@ -3313,6 +3316,7 @@ const AdminDashboard = ({ user, setToast }: { user: User, setToast?: (toast: { m
   };
 
   const handleDeleteUser = async (targetId: number, targetName: string) => {
+    console.log('Attempting to delete user:', { targetId, targetName, requesterId: user.id, requesterRole: user.role });
     if (!window.confirm(`Are you sure you want to delete ${targetName}? This action cannot be undone.`)) {
       return;
     }
@@ -3320,7 +3324,12 @@ const AdminDashboard = ({ user, setToast }: { user: User, setToast?: (toast: { m
       const res = await fetch(`/api/users/${targetId}?requester=${user.id}`, {
         method: 'DELETE'
       });
-      if (!res.ok) throw new Error(`status ${res.status}`);
+      console.log('Delete response:', { status: res.status, ok: res.ok });
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('Delete failed:', errorText);
+        throw new Error(`status ${res.status}: ${errorText}`);
+      }
       setToast?.({ message: `${targetName} has been deleted from the database.`, type: 'success' });
       fetchData();
     } catch (err) {
