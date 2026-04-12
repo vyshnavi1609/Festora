@@ -345,6 +345,34 @@ setInterval(async () => {
         console.error('Error cleaning up expired stories:', e);
     }
 }, 60 * 60 * 1000); // Run every hour
+
+const cleanUpExpiredEvents = async () => {
+    try {
+        const expiredIds = await (0, db_js_1.query)("SELECT id FROM events WHERE date::timestamp < NOW()", []);
+        if (!expiredIds.length) return;
+        const ids = expiredIds.map((row) => row.id);
+        await (0, db_js_1.execute)("BEGIN");
+        try {
+            await (0, db_js_1.execute)("DELETE FROM registrations WHERE event_id = ANY($1)", [ids]);
+            await (0, db_js_1.execute)("DELETE FROM comments WHERE event_id = ANY($1)", [ids]);
+            await (0, db_js_1.execute)("DELETE FROM likes WHERE event_id = ANY($1)", [ids]);
+            await (0, db_js_1.execute)("DELETE FROM bookmarks WHERE event_id = ANY($1)", [ids]);
+            await (0, db_js_1.execute)("DELETE FROM reminders WHERE event_id = ANY($1)", [ids]);
+            await (0, db_js_1.execute)("DELETE FROM event_reminders WHERE event_id = ANY($1)", [ids]);
+            await (0, db_js_1.execute)("DELETE FROM events WHERE id = ANY($1)", [ids]);
+            await (0, db_js_1.execute)("COMMIT");
+            console.log(`Cleaned up ${ids.length} expired events`);
+        }
+        catch (cleanupError) {
+            await (0, db_js_1.execute)("ROLLBACK");
+            throw cleanupError;
+        }
+    }
+    catch (e) {
+        console.error('Error cleaning up expired events:', e);
+    }
+};
+setInterval(cleanUpExpiredEvents, 60 * 60 * 1000); // Run every hour
 // Express app initialization must come before all route definitions
 const app = (0, express_1.default)();
 app.use(express_1.default.json());
@@ -900,11 +928,13 @@ app.post("/api/users/:id/profile", async (req, res) => {
 });
 // Event Routes
 app.get("/api/events/user/:id/count", async (req, res) => {
+    await cleanUpExpiredEvents();
     const count = await (0, db_js_1.queryOne)("SELECT COUNT(*) as count FROM events WHERE created_by = $1", [req.params.id]);
     res.json(count);
 });
 // Get events, filter private events by college code if provided
 app.get("/api/events", async (req, res) => {
+    await cleanUpExpiredEvents();
     const { college_code } = req.query;
     let events;
     if (college_code) {
@@ -1405,6 +1435,7 @@ app.get("/api/notifications/:userId", async (req, res) => {
 });
 // helper to fetch a single event (used for deep-linking)
 app.get("/api/events/:id", async (req, res) => {
+    await cleanUpExpiredEvents();
     const event = await (0, db_js_1.queryOne)("SELECT * FROM events WHERE id = $1", [req.params.id]);
     if (event)
         res.json(event);
