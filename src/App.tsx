@@ -3836,6 +3836,23 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
   const [collegeSearch, setCollegeSearch] = useState('');
   const [showCollegeDropdown, setShowCollegeDropdown] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+
+  // Load remembered identifier on component mount
+  useEffect(() => {
+    const rememberedIdentifier = localStorage.getItem('festora_remembered_identifier');
+    if (rememberedIdentifier) {
+      setFormData(prev => ({ ...prev, identifier: rememberedIdentifier }));
+      setRememberMe(true);
+    }
+  }, []);
+
+  // Clear remembered identifier when remember me is unchecked
+  useEffect(() => {
+    if (!rememberMe) {
+      localStorage.removeItem('festora_remembered_identifier');
+    }
+  }, [rememberMe]);
 
   // Sync college search with selected college
   useEffect(() => {
@@ -3915,6 +3932,14 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
       
       if (res.ok) {
         console.log('Login/Register successful, user:', data);
+        
+        // Handle remember me functionality
+        if (isLogin && rememberMe) {
+          localStorage.setItem('festora_remembered_identifier', formData.identifier);
+        } else if (isLogin && !rememberMe) {
+          localStorage.removeItem('festora_remembered_identifier');
+        }
+        
         setIsLoading(false);
         onLogin(data);
       } else {
@@ -4021,6 +4046,7 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
                 value={formData.identifier}
                 onChange={e => setFormData({...formData, identifier: e.target.value})}
                 required
+                autoComplete="username"
               />
               <div className="relative">
                 <input 
@@ -4030,10 +4056,22 @@ const AuthView = ({ onLogin }: { onLogin: (u: User) => void }) => {
                   value={formData.password}
                   onChange={e => setFormData({...formData, password: e.target.value})}
                   required
+                  autoComplete="current-password"
                 />
                 <button type="button" onClick={() => setShowPassword(s => !s)} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500">
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    checked={rememberMe}
+                    onChange={e => setRememberMe(e.target.checked)}
+                    className="w-4 h-4 text-indigo-600 bg-zinc-100 border-zinc-300 rounded focus:ring-indigo-500 focus:ring-2"
+                  />
+                  <span className="text-[10px] font-black uppercase tracking-widest text-zinc-600">Remember Me</span>
+                </label>
               </div>
               {error && <p className="text-red-500 text-[10px] text-center font-black uppercase tracking-widest">{error}</p>}
               <Button type="submit" disabled={isLoading} variant="primary" className="w-full py-5 text-xs disabled:opacity-50">
