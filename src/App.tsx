@@ -3321,11 +3321,11 @@ const AdminDashboard = ({ user, setToast }: { user: User, setToast?: (toast: { m
         method: 'DELETE'
       });
       if (!res.ok) throw new Error(`status ${res.status}`);
-      alert(`${targetName} has been deleted from the database.`);
+      setToast?.({ message: `${targetName} has been deleted from the database.`, type: 'success' });
       fetchData();
     } catch (err) {
       console.error('delete user failed', err);
-      alert('Failed to delete user');
+      setToast?.({ message: 'Failed to delete user', type: 'error' });
     }
   };
 
