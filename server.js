@@ -744,7 +744,12 @@ app.get("/api/clubs/:id/followers-count", async (req, res) => {
     res.json({ count: parseInt(result.count) });
 });
 app.get("/api/users/:id/clubs", async (req, res) => {
-    const clubs = await (0, db_js_1.query)("SELECT * FROM clubs WHERE president_id = $1", [req.params.id]);
+    const clubs = await (0, db_js_1.query)(`
+      SELECT DISTINCT c.*
+      FROM clubs c
+      LEFT JOIN club_members cm ON c.id = cm.club_id
+      WHERE c.president_id = $1 OR (cm.user_id = $1 AND cm.role = 'president')
+    `, [req.params.id]);
     res.json(clubs);
 });
 // Club Request: Club President submits request to create a club
