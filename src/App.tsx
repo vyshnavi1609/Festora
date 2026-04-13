@@ -4368,7 +4368,7 @@ const SettingsView = ({ user, onLogout, onBack, setActiveTab, onOpenClubRequest 
     { icon: QrCode, label: 'Story, live and location', key: 'story_settings', color: 'text-rose-500', desc: 'Who can see your story' },
     { icon: MessageCircle, label: 'Messages and story replies', key: 'reply_settings', color: 'text-violet-600', desc: 'Control replies and DMs' },
     { icon: Globe, label: 'Follow and invite friends', key: 'follow_invite', color: 'text-amber-700', desc: 'Invite people to Festora' },
-    ...(user.role === 'club_president' ? [{ icon: Plus, label: 'Request Club', key: 'request_club', color: 'text-indigo-700', desc: 'Create a new college club' }, { icon: Users, label: 'Manage Club', key: 'manage_club', color: 'text-blue-700', desc: 'Manage your club members' }] : []),
+    ...(user.role === 'club_president' ? [{ icon: Users, label: 'Role Requests', key: 'role_requests', color: 'text-blue-700', desc: 'Review club requests' }] : []),
     ...(user.role === 'council_president' ? [{ icon: CheckCircle2, label: 'Club Requests', key: 'club_requests', color: 'text-emerald-700', desc: 'Review club requests' }, { icon: Users, label: 'Role Requests', key: 'role_requests', color: 'text-blue-700', desc: 'Review role requests' }] : [])
   ];
 
@@ -4961,8 +4961,12 @@ const RoleRequestsView = ({ user, onBack, setToast }: { user: User, onBack?: () 
     fetch(`/api/role-requests/${user.id}`)
       .then(res => res.json())
       .then(data => {
-        // Filter to show only pending role requests for club_president
-        const filtered = data.filter((req: any) => req.requested_role === 'club_president' && req.status === 'pending');
+        const filtered = data.filter((req: any) => {
+          if (req.status !== 'pending') return false;
+          if (user.role === 'council_president') return req.requested_role === 'club_president';
+          if (user.role === 'club_president') return req.requested_role === 'club_member';
+          return false;
+        });
         setRequests(filtered);
       })
       .catch(() => setRequests([]));
@@ -5981,7 +5985,7 @@ export default function App() {
           )}
           {activeTab === 'settings' && <SettingsView user={user} onLogout={() => setUser(null)} onBack={() => setActiveTab(previousTab)} setActiveTab={setActiveTab} onOpenClubRequest={() => setShowClubRequestModal(true)} />}
           {activeTab === 'club-requests' && user.role === 'council_president' && <ClubRequestsView user={user} onBack={() => setActiveTab(previousTab)} setToast={setToast} />}
-          {activeTab === 'role-requests' && user.role === 'council_president' && <RoleRequestsView user={user} onBack={() => setActiveTab(previousTab)} setToast={setToast} />}
+          {activeTab === 'role-requests' && (user.role === 'council_president' || user.role === 'club_president') && <RoleRequestsView user={user} onBack={() => setActiveTab(previousTab)} setToast={setToast} />}
           {activeTab === 'club-management' && user.role === 'club_president' && <ClubManagementView user={user} onBack={() => setActiveTab(previousTab)} />}
         </motion.div>
       </AnimatePresence>
