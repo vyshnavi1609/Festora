@@ -1314,16 +1314,33 @@ app.post("/api/events", async (req, res) => {
       console.warn('Missing created_by field');
       return res.status(400).json({ error: "User ID is required" });
     }
-        const eventDate = new Date(date);
-        if (isNaN(eventDate.getTime())) {
-            return res.status(400).json({ error: "Invalid event date" });
-        }
-        const normalizedDate = eventDate.toISOString();
+
+    // Check if user is a student - students cannot create events
+    const user = await queryOne("SELECT role FROM users WHERE id = $1", [created_by]);
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
     }
+    if (user.role === 'student') {
+      return res.status(403).json({ error: "Students cannot create events" });
+    }
+
+    if (!google_form_url.startsWith('http')) {
+      return res.status(400).json({ error: "Google Form URL must start with http or https" });
+    }
+
+    const eventDate = new Date(date);
+    if (isNaN(eventDate.getTime())) {
+      return res.status(400).json({ error: "Invalid event date" });
+    }
+    const normalizedDate = eventDate.toISOString();
+
     const eventPrivacy = privacy === 'private' ? 'private' : 'social';
     const eventCollegeCode = eventPrivacy === 'private' ? (college_code || null) : null;
-    const result = await queryOne("INSERT INTO events (title, description, image_url, date, location, category, created_by, privacy, college_code, club_id, pass, google_form_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id", [
-            title, description, image_url, normalizedDate, location, category || 'Social', created_by, eventPrivacy, eventCollegeCode, club_id || null, pass || null, google_form_url || null
+    const result = await queryOne(
+      "INSERT INTO events (title, description, image_url, date, location, category, created_by, privacy, college_code, club_id, pass, google_form_url) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id",
+      [title, description, image_url, normalizedDate, location, category || 'Social', created_by, eventPrivacy, eventCollegeCode, club_id || null, pass || null, google_form_url || null]
+    );
+
     if (club_id) {
       const club = await queryOne("SELECT name FROM clubs WHERE id = $1", [club_id]);
       const followers = await query("SELECT user_id FROM club_follows WHERE club_id = $1", [club_id]);
