@@ -2558,7 +2558,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
   const [profileSuggestions, setProfileSuggestions] = useState<User[]>([]);
   const [showClubPresidentRequestModal, setShowClubPresidentRequestModal] = useState(false);
   const [showClubMemberRequestModal, setShowClubMemberRequestModal] = useState(false);
-  const [clubMemberRequestData, setClubMemberRequestData] = useState({ reason: '' });
+  const [clubMemberRequestData, setClubMemberRequestData] = useState({ reason: '', selectedClubId: null as number | null });
   const [editData, setEditData] = useState({
     bio: '',
     social_links: { instagram: '', twitter: '', linkedin: '', website: '' },
@@ -2992,14 +2992,6 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                       🎯 Request to Join Club
                     </button>
                   )}
-                  {profileClubs.length === 0 && (
-                    <button 
-                      onClick={() => setShowClubMemberRequestModal(true)}
-                      className="w-full bg-rose-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all border border-rose-100 active:scale-95"
-                    >
-                      🎯 Request Club Member Role
-                    </button>
-                  )}
                 </>
               )}
               {targetUser?.role === 'council_president' && user.id !== targetUser?.id && user.role !== 'admin' && user.role !== 'council_president' && user.role !== 'club_president' && (
@@ -3103,6 +3095,19 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
               </div>
               <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
                 <div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-2">Select Club</label>
+                  <select 
+                    value={clubMemberRequestData.selectedClubId || ''}
+                    onChange={e => setClubMemberRequestData({ ...clubMemberRequestData, selectedClubId: e.target.value ? parseInt(e.target.value) : null })}
+                    className="input-field"
+                  >
+                    <option value="">Choose a club...</option>
+                    {profileClubs.map((club: any) => (
+                      <option key={club.id} value={club.id}>{club.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500 block mb-2">Reason (Optional)</label>
                   <textarea 
                     placeholder="Tell us why you want to join this club..."
@@ -3121,6 +3126,10 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                 </button>
                 <button 
                   onClick={async () => {
+                    if (!clubMemberRequestData.selectedClubId) {
+                      setToast?.({ message: 'Please select a club', type: 'error' });
+                      return;
+                    }
                     try {
                       const res = await fetch('/api/role-requests', {
                         method: 'POST',
@@ -3129,14 +3138,14 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                           requester_id: user.id,
                           target_user_id: user.id,
                           requested_role: 'club_member',
-                          club_id: profileClubs[0].id,
+                          club_id: clubMemberRequestData.selectedClubId,
                           description: clubMemberRequestData.reason || ''
                         })
                       });
                       if (res.ok) {
                         setToast?.({ message: 'Club membership request sent!', type: 'success' });
                         setShowClubMemberRequestModal(false);
-                        setClubMemberRequestData({ reason: '' });
+                        setClubMemberRequestData({ reason: '', selectedClubId: null });
                       } else {
                         const error = await res.json();
                         setToast?.({ message: error.error || 'Error sending request', type: 'error' });
@@ -5684,6 +5693,16 @@ export default function App() {
   const [showClubRequestModal, setShowClubRequestModal] = useState(false);
   const [clubRequests, setClubRequests] = useState<any[]>([]);
   const [shareEventModal, setShareEventModal] = useState<{ isOpen: boolean, event: Event | null }>({ isOpen: false, event: null });
+
+  // Auto-hide toast after 5 seconds
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => {
+        setToast(null);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   const fetchEvents = () => {
     const url = user?.college_name ? `/api/events?college_code=${encodeURIComponent(user.college_name)}` : '/api/events';
