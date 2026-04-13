@@ -2994,10 +2994,10 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                   )}
                   {profileClubs.length === 0 && (
                     <button 
-                      disabled
-                      className="w-full bg-zinc-100 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-zinc-400 border border-zinc-200"
+                      onClick={() => setShowClubMemberRequestModal(true)}
+                      className="w-full bg-rose-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all border border-rose-100 active:scale-95"
                     >
-                      🎯 No Active Clubs
+                      🎯 Request Club Member Role
                     </button>
                   )}
                 </>
@@ -5635,12 +5635,41 @@ export default function App() {
       else localStorage.removeItem('festora_user');
     } catch (e) { /* ignore */ }
   }, [user]);
-  const [activeTab, setActiveTab] = useState('home');
+  const getInitialTab = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const prof = urlParams.get('profile');
+    if (prof && !isNaN(Number(prof))) return 'profile';
+    const tab = urlParams.get('tab');
+    if (tab && ['home', 'search', 'create', 'profile', 'settings', 'notifications', 'club-requests'].includes(tab)) return tab;
+    const view = urlParams.get('view');
+    if (view === 'role-request') return 'role-request';
+    return 'home';
+  };
+
+  const getInitialViewingProfileId = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const prof = urlParams.get('profile');
+    if (prof) {
+      const pid = Number(prof);
+      if (!isNaN(pid)) return pid;
+    }
+    return null;
+  };
+
+  const getInitialViewingRoleRequestId = () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const view = urlParams.get('view');
+    const id = urlParams.get('id');
+    if (view === 'role-request' && id && !isNaN(Number(id))) return Number(id);
+    return null;
+  };
+
+  const [activeTab, setActiveTab] = useState(getInitialTab());
   const [events, setEvents] = useState<Event[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [editingEvent, setEditingEvent] = useState<Event | null>(null);
-  const [viewingProfileId, setViewingProfileId] = useState<number | null>(null);
-  const [viewingRoleRequestId, setViewingRoleRequestId] = useState<number | null>(null);
+  const [viewingProfileId, setViewingProfileId] = useState<number | null>(getInitialViewingProfileId());
+  const [viewingRoleRequestId, setViewingRoleRequestId] = useState<number | null>(getInitialViewingRoleRequestId());
   const [viewingEvent, setViewingEvent] = useState<Event | null>(null);
   const [registeringEvent, setRegisteringEvent] = useState<Event | null>(null);
   const [registeredEventIds, setRegisteredEventIds] = useState<number[]>([]);
