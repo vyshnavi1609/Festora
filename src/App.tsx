@@ -2956,6 +2956,14 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                   {isEditing ? 'Cancel' : 'Edit Profile'}
                 </button>
               </div>
+              {isOwnProfile && user.role === 'club_president' && profileClubs.length === 0 && (
+                <button 
+                  onClick={() => setShowClubMemberRequestModal(true)}
+                  className="w-full bg-rose-50 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all border border-rose-100 active:scale-95"
+                >
+                  🎯 Request Club Member Role
+                </button>
+              )}
             </>
           ) : (
             <>
@@ -2989,7 +2997,7 @@ const ProfileView = ({ user, targetUserId, onLogout, onUpdate, onBack, onViewPro
                       disabled
                       className="w-full bg-zinc-100 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-zinc-400 border border-zinc-200"
                     >
-                      🎯 No Clubs Available
+                      🎯 No Active Clubs
                     </button>
                   )}
                 </>
